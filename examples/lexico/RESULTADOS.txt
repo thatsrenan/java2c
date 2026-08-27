@@ -1,0 +1,454 @@
+===== L01.java =====
+--- entrada ---
+while
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 2: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L02.java =====
+--- entrada ---
+whileLoop
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 2: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L03.java =====
+--- entrada ---
+int
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 2: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L04.java =====
+--- entrada ---
+interface2
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 2: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L05.java =====
+--- entrada ---
+_main
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 2: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L06.java =====
+--- entrada ---
+2x
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+>> Programa reconhecido com sucesso.
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L07.java =====
+--- entrada ---
+int a = 0;
+int b = 10;
+int c = 1000;
+--- saida (stdout+stderr) ---
+=== Prototipo Flex + Bison: iniciando analise ===
+   [decl]   tipo=int nome=a valor_inicial=0
+   [decl]   tipo=int nome=b valor_inicial=10
+   [decl]   tipo=int nome=c valor_inicial=1000
+>> Programa reconhecido com sucesso.
+=== Analise concluida sem erros ===
+exit code: 0
+
+===== L08.java =====
+--- entrada ---
+double a = 3.14;
+double b = 10.0;
+double c = 0.25;
+--- saida (stdout+stderr) ---
+=== Prototipo Flex + Bison: iniciando analise ===
+   [decl]   tipo=double nome=a valor_inicial=3
+   [decl]   tipo=double nome=b valor_inicial=10
+   [decl]   tipo=double nome=c valor_inicial=0
+>> Programa reconhecido com sucesso.
+=== Analise concluida sem erros ===
+exit code: 0
+
+===== L09.java =====
+--- entrada ---
+123abc
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+>> Programa reconhecido com sucesso.
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L10.java =====
+--- entrada ---
+double x = 3.14.15;
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L11.java =====
+--- entrada ---
+double x = 1e10;
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L12.java =====
+--- entrada ---
+float x = 3.14f;
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L13.java =====
+--- entrada ---
+true
+false
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+>> Programa reconhecido com sucesso.
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L14.java =====
+--- entrada ---
+boolean ativo = true;
+--- saida (stdout+stderr) ---
+=== Prototipo Flex + Bison: iniciando analise ===
+   [decl]   tipo=boolean nome=ativo valor_inicial=1
+>> Programa reconhecido com sucesso.
+=== Analise concluida sem erros ===
+exit code: 0
+
+===== L15.java =====
+--- entrada ---
+char a = 'A';
+char b = '0';
+char c = ' ';
+--- saida (stdout+stderr) ---
+=== Prototipo Flex + Bison: iniciando analise ===
+   [decl]   tipo=char nome=a valor_inicial=65
+   [decl]   tipo=char nome=b valor_inicial=48
+   [decl]   tipo=char nome=c valor_inicial=32
+>> Programa reconhecido com sucesso.
+=== Analise concluida sem erros ===
+exit code: 0
+
+===== L16.java =====
+--- entrada ---
+char c = '\n';
+--- saida (stdout+stderr) ---
+ERRO LEXICO na linha 1: caractere ''' nao reconhecido.
+ERRO LEXICO na linha 1: caractere '\' nao reconhecido.
+ERRO LEXICO na linha 1: caractere ''' nao reconhecido.
+=== Prototipo Flex + Bison: iniciando analise ===
+   [decl]   tipo=char nome=c valor_inicial=0
+>> Programa reconhecido com sucesso.
+=== Analise concluida sem erros ===
+exit code: 0
+
+===== L17.java =====
+--- entrada ---
+char c = 'A
+;
+--- saida (stdout+stderr) ---
+ERRO LEXICO na linha 1: caractere ''' nao reconhecido.
+=== Prototipo Flex + Bison: iniciando analise ===
+   [decl]   tipo=char nome=c valor_inicial=0
+>> Programa reconhecido com sucesso.
+=== Analise concluida sem erros ===
+exit code: 0
+
+===== L18.java =====
+--- entrada ---
+char c = '';
+--- saida (stdout+stderr) ---
+ERRO LEXICO na linha 1: caractere ''' nao reconhecido.
+ERRO LEXICO na linha 1: caractere ''' nao reconhecido.
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L19.java =====
+--- entrada ---
+char c = 'AB';
+--- saida (stdout+stderr) ---
+ERRO LEXICO na linha 1: caractere ''' nao reconhecido.
+ERRO LEXICO na linha 1: caractere ''' nao reconhecido.
+=== Prototipo Flex + Bison: iniciando analise ===
+   [decl]   tipo=char nome=c valor_inicial=0
+>> Programa reconhecido com sucesso.
+=== Analise concluida sem erros ===
+exit code: 0
+
+===== L20.java =====
+--- entrada ---
+System.out.println("Ola");
+System.out.println("");
+System.out.println("Resultado:");
+--- saida (stdout+stderr) ---
+=== Prototipo Flex + Bison: iniciando analise ===
+   [print-arg] string="Ola"
+   [print]  System.out.println(...)
+   [print-arg] string=""
+   [print]  System.out.println(...)
+   [print-arg] string="Resultado:"
+   [print]  System.out.println(...)
+>> Programa reconhecido com sucesso.
+=== Analise concluida sem erros ===
+exit code: 0
+
+===== L21.java =====
+--- entrada ---
+System.out.println("Ola);
+--- saida (stdout+stderr) ---
+ERRO LEXICO na linha 1: caractere '"' nao reconhecido.
+=== Prototipo Flex + Bison: iniciando analise ===
+   [print]  System.out.println(...)
+>> Programa reconhecido com sucesso.
+=== Analise concluida sem erros ===
+exit code: 0
+
+===== L22.java =====
+--- entrada ---
+System.out.println("linha
+quebrada");
+--- saida (stdout+stderr) ---
+ERRO LEXICO na linha 1: caractere '"' nao reconhecido.
+ERRO DE SINTAXE na linha 2: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L23.java =====
+--- entrada ---
+System.out.println("texto");
+--- saida (stdout+stderr) ---
+=== Prototipo Flex + Bison: iniciando analise ===
+   [print-arg] string="texto"
+   [print]  System.out.println(...)
+>> Programa reconhecido com sucesso.
+=== Analise concluida sem erros ===
+exit code: 0
+
+===== L24.java =====
+--- entrada ---
+// comentario de linha
+int x = 10;
+--- saida (stdout+stderr) ---
+=== Prototipo Flex + Bison: iniciando analise ===
+   [decl]   tipo=int nome=x valor_inicial=10
+>> Programa reconhecido com sucesso.
+=== Analise concluida sem erros ===
+exit code: 0
+
+===== L25.java =====
+--- entrada ---
+/* bloco
+ * de comentario */
+int x = 10;
+--- saida (stdout+stderr) ---
+=== Prototipo Flex + Bison: iniciando analise ===
+   [decl]   tipo=int nome=x valor_inicial=10
+>> Programa reconhecido com sucesso.
+=== Analise concluida sem erros ===
+exit code: 0
+
+===== L26.java =====
+--- entrada ---
+/* sem fechar
+int x = 10;
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+>> Programa reconhecido com sucesso.
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L27.java =====
+--- entrada ---
+/* aninhado /* dentro */ x = 1; */
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+   [attrib] x = 1
+>> Programa reconhecido com sucesso.
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L28.java =====
+--- entrada ---
+x == y;
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L29.java =====
+--- entrada ---
+x <= y;
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L30.java =====
+--- entrada ---
+i++;
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L31.java =====
+--- entrada ---
+x += 1;
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L32.java =====
+--- entrada ---
+i+++j;
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L33.java =====
+--- entrada ---
+a<b;
+a<=b;
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L34.java =====
+--- entrada ---
+int x = 10 @ 5;
+--- saida (stdout+stderr) ---
+ERRO LEXICO na linha 1: caractere '@' nao reconhecido.
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L35.java =====
+--- entrada ---
+x &= 10;
+--- saida (stdout+stderr) ---
+ERRO LEXICO na linha 1: caractere '&' nao reconhecido.
+=== Prototipo Flex + Bison: iniciando analise ===
+   [attrib] x = 10
+>> Programa reconhecido com sucesso.
+=== Analise concluida sem erros ===
+exit code: 0
+
+===== L36.java =====
+--- entrada ---
+x ** 2;
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L37.java =====
+--- entrada ---
+nome-variavel;
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L38.java =====
+--- entrada ---
+x#y;
+--- saida (stdout+stderr) ---
+ERRO LEXICO na linha 1: caractere '#' nao reconhecido.
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L39.java =====
+--- entrada ---
+int    x
+    =
+    10
+    ;
+--- saida (stdout+stderr) ---
+=== Prototipo Flex + Bison: iniciando analise ===
+   [decl]   tipo=int nome=x valor_inicial=10
+>> Programa reconhecido com sucesso.
+=== Analise concluida sem erros ===
+exit code: 0
+
+===== L40.java =====
+--- entrada ---
+int	x=10;
+--- saida (stdout+stderr) ---
+=== Prototipo Flex + Bison: iniciando analise ===
+   [decl]   tipo=int nome=x valor_inicial=10
+>> Programa reconhecido com sucesso.
+=== Analise concluida sem erros ===
+exit code: 0
+
+===== L41.java =====
+--- entrada ---
+System.out.println(x);
+--- saida (stdout+stderr) ---
+=== Prototipo Flex + Bison: iniciando analise ===
+   [print]  System.out.println(...)
+>> Programa reconhecido com sucesso.
+=== Analise concluida sem erros ===
+exit code: 0
+
+===== L42.java =====
+--- entrada ---
+Foo.bar.baz(1);
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 1: construcao de impressao invalida (esperado System.out.println)
+=== Prototipo Flex + Bison: iniciando analise ===
+=== Analise concluida com erros ===
+exit code: 1
+
+===== L43.java =====
+--- entrada ---
+3.14.println();
+--- saida (stdout+stderr) ---
+ERRO DE SINTAXE na linha 1: syntax error
+=== Prototipo Flex + Bison: iniciando analise ===
+>> Programa reconhecido com sucesso.
+=== Analise concluida com erros ===
+exit code: 1
+
