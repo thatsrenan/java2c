@@ -83,11 +83,17 @@ stmt_list:
 
 stmt:
         vardecl
-    | assign_stmt
-    | print_stmt
-    | if_stmt
-    | while_stmt
-    | block
+    |   assign_stmt
+    |   print_stmt
+    |   if_stmt
+    |   while_stmt
+    |   for_stmt
+    |   do_while_stmt
+    |   break_stmt
+    |   continue_stmt
+    |   return_stmt
+    |   increment_stmt
+    |   block
     ;
 
 block:
