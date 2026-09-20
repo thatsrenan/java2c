@@ -32,9 +32,10 @@ extern int yylineno;
     char   *sval;
 }
 
-/* Palavras-chave */
+/* Palavras-chave*/
 %token PUBLIC STATIC CLASS
-%token INT FLOAT DOUBLE BOOLEAN CHAR VOID
+
+%token INT FLOAT DOUBLE BOOLEAN CHAR VOID STRING_TYPE //adicionado  o token para a palavra‑chave String (o tipo de dado) não o literal (valor).
 %token IF ELSE WHILE FOR DO BREAK CONTINUE RETURN
 
 /* Literais e identificadores */
@@ -53,8 +54,7 @@ extern int yylineno;
 %token INCREMENT DECREMENT
 
 /* Delimitadores */
-%token LPAREN RPAREN LBRACE RBRACE SEMICOLON COMMA DOT
-
+%token LPAREN RPAREN LBRACE RBRACE SEMICOLON COMMA DOT LBRACKET RBRACKET //adicionado '[' ']'
 %type <sval> type
 %type <ival> expr
 
