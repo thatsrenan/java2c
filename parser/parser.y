@@ -5,11 +5,12 @@
  * Java -> C. Cobre apenas um subconjunto pequeno da linguagem, suficiente
  * para validar a integracao entre Flex e Bison:
  *
- *   - declaracao de variavel (int, float, double, boolean, char)
- *   - atribuicao
+ *   - declaracao de variavel (int, float, double, boolean, char, String)
+ *   - atribuicao (=, +=, -=, *=, /=)
  *   - expressoes aritmeticas, relacionais e logicas com precedencia
- *   - if / else
- *   - while
+ *   - if / else if / else
+ *   - while, for, do-while, break, continue, return
+ *   - incremento/decremento (i++, ++i, i--, --i)
  *   - blocos { ... }
  *   - construcao simplificada System.out.println(...)
  *
@@ -32,10 +33,9 @@ extern int yylineno;
     char   *sval;
 }
 
-/* Palavras-chave*/
+/* Palavras-chave */
 %token PUBLIC STATIC CLASS
-
-%token INT FLOAT DOUBLE BOOLEAN CHAR VOID STRING_TYPE //adicionado  o token para a palavra‑chave String (o tipo de dado) não o literal (valor).
+%token INT FLOAT DOUBLE BOOLEAN CHAR VOID STRING_TYPE
 %token IF ELSE WHILE FOR DO BREAK CONTINUE RETURN
 
 /* Literais e identificadores */
@@ -54,8 +54,9 @@ extern int yylineno;
 %token INCREMENT DECREMENT
 
 /* Delimitadores */
-%token LPAREN RPAREN LBRACE RBRACE SEMICOLON COMMA DOT LBRACKET RBRACKET //adicionado '[' ']'
-%type <sval> type
+%token LPAREN RPAREN LBRACE RBRACE LBRACKET RBRACKET SEMICOLON COMMA DOT
+
+%type <sval> type assign_op
 %type <ival> expr
 
 /* Precedencia (da menor para a maior) */
@@ -101,11 +102,12 @@ block:
     ;
 
 type:
-        INT      { $$ = "int"; }
-    |   FLOAT    { $$ = "float"; }
-    |   DOUBLE   { $$ = "double"; }
-    |   BOOLEAN  { $$ = "boolean"; }
-    |   CHAR     { $$ = "char"; }
+        INT          { $$ = "int"; }
+    |   FLOAT        { $$ = "float"; }
+    |   DOUBLE       { $$ = "double"; }
+    |   BOOLEAN      { $$ = "boolean"; }
+    |   CHAR         { $$ = "char"; }
+    |   STRING_TYPE  { $$ = "String"; }
     ;
 
 vardecl:
@@ -117,12 +119,43 @@ vardecl:
         {
             printf("   [decl]   tipo=%s nome=%s valor_inicial=%d\n", $1, $2, $4);
         }
+    |   type IDENTIFIER ASSIGN STRING_LITERAL SEMICOLON
+        {
+            printf("   [decl]   tipo=%s nome=%s valor_inicial=\"%s\"\n", $1, $2, $4);
+        }
+    ;
+
+assign_op:
+        ASSIGN         { $$ = "="; }
+    |   PLUS_ASSIGN    { $$ = "+="; }
+    |   MINUS_ASSIGN   { $$ = "-="; }
+    |   MULT_ASSIGN    { $$ = "*="; }
+    |   DIV_ASSIGN     { $$ = "/="; }
     ;
 
 assign_stmt:
-        IDENTIFIER ASSIGN expr SEMICOLON
+        IDENTIFIER assign_op expr SEMICOLON
         {
-            printf("   [attrib] %s = %d\n", $1, $3);
+            printf("   [attrib] %s %s %d\n", $1, $2, $3);
+        }
+    ;
+
+increment_stmt:
+        IDENTIFIER INCREMENT SEMICOLON
+        {
+            printf("   [incr]   %s++\n", $1);
+        }
+    |   IDENTIFIER DECREMENT SEMICOLON
+        {
+            printf("   [decr]   %s--\n", $1);
+        }
+    |   INCREMENT IDENTIFIER SEMICOLON
+        {
+            printf("   [incr]   ++%s\n", $2);
+        }
+    |   DECREMENT IDENTIFIER SEMICOLON
+        {
+            printf("   [decr]   --%s\n", $2);
         }
     ;
 
@@ -159,12 +192,82 @@ if_stmt:
         {
             printf("   [if/else] condicao avaliada\n");
         }
+    |   IF LPAREN expr RPAREN block ELSE if_stmt
+        {
+            printf("   [if/else if] condicao avaliada\n");
+        }
     ;
 
 while_stmt:
         WHILE LPAREN expr RPAREN block
         {
             printf("   [while]  condicao avaliada\n");
+        }
+    ;
+
+/*
+ * for ( init ; condicao ; atualizacao ) bloco
+ * Os tres campos sao opcionais, como na spec ([<init>] ; [<cond>] ; [<inc>]).
+ */
+for_stmt:
+        FOR LPAREN for_init SEMICOLON for_cond SEMICOLON for_update RPAREN block
+        {
+            printf("   [for]    laco reconhecido\n");
+        }
+    ;
+
+for_init:
+        /* vazio */
+    |   type IDENTIFIER ASSIGN expr
+        {
+            printf("   [for-init] tipo=%s nome=%s valor_inicial=%d\n", $1, $2, $4);
+        }
+    |   IDENTIFIER assign_op expr
+    ;
+
+for_cond:
+        /* vazio */
+    |   expr
+    ;
+
+for_update:
+        /* vazio */
+    |   IDENTIFIER assign_op expr
+    |   IDENTIFIER INCREMENT
+    |   IDENTIFIER DECREMENT
+    |   INCREMENT IDENTIFIER
+    |   DECREMENT IDENTIFIER
+    ;
+
+do_while_stmt:
+        DO block WHILE LPAREN expr RPAREN SEMICOLON
+        {
+            printf("   [do-while] laco reconhecido\n");
+        }
+    ;
+
+break_stmt:
+        BREAK SEMICOLON
+        {
+            printf("   [break]\n");
+        }
+    ;
+
+continue_stmt:
+        CONTINUE SEMICOLON
+        {
+            printf("   [continue]\n");
+        }
+    ;
+
+return_stmt:
+        RETURN SEMICOLON
+        {
+            printf("   [return] sem valor\n");
+        }
+    |   RETURN expr SEMICOLON
+        {
+            printf("   [return] com valor\n");
         }
     ;
 
@@ -199,9 +302,4 @@ void yyerror(const char *s) {
     fprintf(stderr, "ERRO DE SINTAXE na linha %d: %s\n", yylineno, s);
 }
 
-/*
- * O main() do prototipo fica em src/main.c, nao aqui. Isso mantem o
- * parser.y focado apenas na gramatica e nas acoes semanticas, e deixa a
- * orquestracao (abrir arquivo, chamar yyparse, reportar resultado) como
- * responsabilidade do programa principal em src/main.c.
- */
+
