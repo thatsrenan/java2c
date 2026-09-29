@@ -24,6 +24,9 @@
 
 #include <errno.h>
 #include <limits.h>
+#include <float.h>
+#include <math.h>
+#include <ctype.h>
 
 /*
  * Flag global que sinaliza se algum erro lexico ocorreu durante a
@@ -51,6 +54,23 @@ static void lex_error(const char *fmt, const char *arg) {
     fprintf(stderr, fmt, arg);
     fputc('\n', stderr);
     had_lexical_error = 1;
+}
+
+/*
+ * Converte yytext (literal real ja validado sintaticamente) e rejeita
+ * valores fora do intervalo: overflow para double (1e999) ou, com sufixo
+ * f/F, fora do intervalo de float (1e39f). Devolve 1 se o valor e valido.
+ */
+static int real_value_ok(void) {
+    size_t n = strlen(yytext);
+    int is_float = (yytext[n - 1] == 'f' || yytext[n - 1] == 'F');
+    double d = strtod(yytext, NULL);
+    if (isinf(d) || (is_float && fabs(d) > (double) FLT_MAX)) {
+        lex_error("literal real '%s' fora do intervalo.", yytext);
+        return 0;
+    }
+    yylval.dval = d;
+    return 1;
 }
 %}
 
@@ -84,15 +104,15 @@ ESC         \\[ntrbf0\\\'\"]
 %%
 
  /* ---------- Tratamento de Comentarios ---------- */
-/*
-Respectivamente
+ /*
+ Respectivamente
  ignora comentário de linha.
  inicia comentário de bloco e guarda a linha inicial.
  fecha o bloco e volta ao estado normal.
  consome conteúdo do bloco sem interferir.
  ignora asterisco solto dentro do bloco.
  detecta fim de arquivo sem fechar o bloco e imprime: ERRO LEXICO na linha X: comentario de bloco nao terminado.
-*/
+ */
 
 "//".*                          { /* comentario de linha: ignorado */ } 
 "/*"                            { comment_start_line = yylineno; BEGIN(BLOCK_COMMENT); }
@@ -108,7 +128,7 @@ Respectivamente
 
 
  /* ---------- Espacos em branco ---------- */
-[ \t\r\n]+                       { /* espacos em branco: ignorados */ }
+[ \t\r\n\f]+                     { /* espacos em branco: ignorados */ }
 
 
  /* ---------- Palavras-chave ---------- */
@@ -146,21 +166,18 @@ Respectivamente
     return REAL_LITERAL; devolve o token para o parser
 */
 
-//número com parte decimal, como 3.14, 2.0, 5.5e10 e opcionalmente aceita exponente e sufixo f, F, d, D
-{DIGIT}+"."{DIGIT}+({EXP})?[fFdD]? {  
-    yylval.dval = atof(yytext);
-    return REAL_LITERAL;
+ /* número com parte decimal, como 3.14, 2.0, 5.5e10 e opcionalmente aceita exponente e sufixo f, F, d, D */
+{DIGIT}+"."{DIGIT}+({EXP})?[fFdD]? {
+    if (real_value_ok()) return REAL_LITERAL;
 }
 
-//número sem ponto, mas com expoente, como 10e3, 7E-2,também aceita sufixo f/d
-{DIGIT}+{EXP}[fFdD]? {   
-    yylval.dval = atof(yytext);
-    return REAL_LITERAL;
+ /* número sem ponto, mas com expoente, como 10e3, 7E-2,também aceita sufixo f/d */
+{DIGIT}+{EXP}[fFdD]? {
+    if (real_value_ok()) return REAL_LITERAL;
 }
-//número inteiro com sufixo de float/double, como 10f, 25d
+ /* número inteiro com sufixo de float/double, como 10f, 25d */
 {DIGIT}+[fFdD] {
-    yylval.dval = atof(yytext);
-    return REAL_LITERAL;
+    if (real_value_ok()) return REAL_LITERAL;
 }
 
 {DIGIT}+ {
@@ -182,13 +199,24 @@ Respectivamente
     lex_error("literal numerico malformado '%s'.", yytext);
 }
 
+ /* Reais malformados: sem estas regras, "1.5e" viraria REAL(1.5) + IDENT(e)
+    e "1.5abc" viraria REAL + IDENT, sem nenhum erro lexico. Empates de
+    tamanho com as regras validas sao resolvidos a favor delas (vem antes). */
+{DIGIT}+"."{DIGIT}+({LETTER}|{DIGIT})* {
+    lex_error("literal numerico malformado '%s'.", yytext);
+}
+
+{DIGIT}+("."{DIGIT}+)?[eE][+-] {
+    lex_error("literal numerico malformado '%s' (expoente sem digitos).", yytext);
+}
+
   /* ---------- Literais de caractere ----------
   * As regras de erro capturam casos malformados com UMA mensagem clara,
   * em vez de deixar o catch-all fragmentar o literal em varios erros de
   * caractere isolado. Regras validas primeiro, para vencer empates de
   * tamanho contra as regras de erro. */
 
-//caractere válido simples, tira aspas e retorna char_literal
+ /* caractere válido simples, tira aspas e retorna char_literal */
 \'[^\'\\\n]\' {
     yylval.sval = strdup(yytext + 1);
     yylval.sval[1] = '\0';
@@ -222,13 +250,21 @@ Respectivamente
   * Aceita qualquer sequencia \x (inclusive \") sem validar o escape; o
   * conteudo e guardado cru, sem as aspas. */
 
-\"([^\"\\\n]|\\.)*\" {
+\"([^\"\\\n]|{ESC})*\" {
     yylval.sval = strdup(yytext + 1);
     yylval.sval[strlen(yylval.sval) - 1] = '\0';
     return STRING_LITERAL;
 }
 
-\"([^\"\\\n]|\\.)* {
+ /* String bem fechada, mas com escape fora de {ESC} (ex.: "a\qb"). Empata em
+    tamanho com a regra valida, que vem antes e vence quando tudo e valido. */
+\"([^\"\\\n]|\\.)*\" {
+    lex_error("escape invalido em string literal: %s", yytext);
+}
+
+ /* O \\? final absorve uma barra solta no fim da linha, evitando um
+    segundo erro "caractere '\\' nao reconhecido". */
+\"([^\"\\\n]|\\.)*\\? {
     lex_error("string literal nao terminada%s.", "");
 }
 
@@ -278,8 +314,23 @@ Respectivamente
 
  /* ---------- Qualquer outra coisa ---------- */
 
+ /* BOM UTF-8 no inicio de uma linha (arquivos salvos pelo Windows) */
+^\xEF\xBB\xBF                  { /* ignorado */ }
+
+ /* Bytes nao-ASCII fora de string/char/comentario: um unico erro por
+    sequencia, em vez de um erro (ilegivel) por byte. */
+[\x80-\xFF]+ {
+    lex_error("caractere(s) nao-ASCII '%s' nao reconhecido(s) fora de literal ou comentario.", yytext);
+}
+
 . {
-    lex_error("caractere '%s' nao reconhecido.", yytext);
+    if (isprint((unsigned char) yytext[0])) {
+        lex_error("caractere '%s' nao reconhecido.", yytext);
+    } else {
+        char hex[8];
+        snprintf(hex, sizeof hex, "0x%02X", (unsigned char) yytext[0]);
+        lex_error("caractere de controle %s nao reconhecido.", hex);
     }
+}
 
 %%

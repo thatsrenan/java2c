@@ -70,6 +70,12 @@ test-lexico: protoparser
 		echo ""; \
 	done
  
+# Confere o lexer (via lextest, sem parser) contra o resultado esperado de cada
+# caso em examples/lexico/esperado.txt e mostra no terminal quantos casos
+# ficaram como esperado. Sai com codigo 1 se algum divergir.
+test-check: lextest
+	@bash tests/check.sh ./lextest examples/lexico
+ 
 # Mesma ideia para examples/escopo/*.java. Hoje isso so exercita o parser
 # estrutural (o prototipo ainda nao faz checagem de escopo/semantica), mas
 # ja serve para ver quais casos passam ou nao pela gramatica atual.
@@ -96,4 +102,4 @@ test-all-save: protoparser lextest
 clean:
 	rm -rf protoparser lextest $(BUILD_DIR)
  
-.PHONY: all test test-tokens test-lexico test-escopo test-all-save clean
+.PHONY: all test test-tokens test-lexico test-check test-escopo test-all-save clean
