@@ -1,0 +1,62 @@
+# Resultado esperado do PARSER COMPLETO (modo "parser" de tests/check.sh) para
+# cada caso de examples/escopo.
+#
+#   NOME  ok                          programa deve ser ACEITO (exit code 0)
+#   NOME  erro : ERRO SEMANTICO       programa deve ser REJEITADO por uma regra
+#                                     de escopo, com a linha de erro comecando
+#                                     por "ERRO SEMANTICO"
+#
+# CONVENCAO: erros de escopo/semantica devem ser impressos como
+#     ERRO SEMANTICO na linha N: <descricao>
+# Exigir esse trecho evita que um caso passe "por acidente": hoje E05 e E07 sao
+# rejeitados, mas por ERRO DE SINTAXE (o parser ainda nao aceita funcoes), e
+# isso NAO conta como a rejeicao de escopo esperada.
+#
+# As expectativas seguem as regras de escopo do Java:
+#  - uma variavel local so existe dentro do bloco onde foi declarada;
+#  - redeclarar um nome no mesmo escopo e erro (inclusive parametro x local);
+#  - uma variavel local NAO pode ocultar outra variavel local visivel
+#    (bloco externo, ou variavel de for), mas PODE ocultar uma variavel
+#    global (static);
+#  - a variavel do init de um for so existe dentro do for.
+#
+# Casos comentados no fim dependem da especificacao do projeto: sem uma linha
+# aqui eles aparecem como [AVISO] e nao entram na contagem.
+
+# ---------- blocos ----------
+E01  ok                                   # y usado dentro do bloco onde foi declarado
+E02  erro : ERRO SEMANTICO                # x usado fora do bloco onde foi declarado
+E03  ok                                   # mesmo nome em blocos irmaos: sem conflito
+E04  erro : ERRO SEMANTICO                # x declarado duas vezes no mesmo bloco
+
+# ---------- funcoes e variaveis globais ----------
+E05  erro : ERRO SEMANTICO                # 'total' e local de a(); b() nao a enxerga
+E06  ok                                   # funcoes distintas, parametros com mesmo nome: ok
+E07  erro : ERRO SEMANTICO                # parametro x redeclarado como local no corpo
+E08  ok                                   # funcao usa e altera variavel global
+E09  ok                                   # local pode ocultar a global 'contador'
+E10  ok                                   # global sem inicializador, atribuida na funcao
+
+# ---------- declaracao e uso ----------
+E11  ok                                   # uso de variável declarada mas sem valor atribuído
+E12  ok                                   # declarada, inicializada e usada
+E13                                       # verificar
+E14  erro: ERRO SEMANTICO                 # Java aceita sobrecarga de soma, mas C não
+E15  ok                                   # duas funcoes com nomes diferentes
+E16  ok                                   # main chama funcao declarada antes
+E17  erro: ERRO SEMANTICO                 # chama "dobro" antes de ser declarado (aceito em Java, não em C)
+
+# ---------- for ----------
+E18  erro : ERRO SEMANTICO                # 'i' do for usado depois do for
+E19  ok                                   # variavel declarada dentro do corpo do for
+E20  erro : ERRO SEMANTICO                # 'i' do for oculta o 'i' local ja visivel
+
+# ---------- PENDENTES: dependem da especificacao ----------
+# E11: 'int x;' seguido de uso. Java rejeita (variavel possivelmente nao
+#      inicializada). Se a spec nao exige essa analise, o caso e 'ok'.
+# E13: atribuicao dentro de 'if (true)'. O javac ACEITA (true e constante, entao x
+#      conta como atribuida), mas uma analise simplificada rejeitaria.
+# E14: sobrecarga de soma(int,int) e soma(double,double). Valido em Java; se a
+#      spec proibe funcoes com o mesmo nome (C nao tem sobrecarga), e erro.
+# E17: main chama dobro, declarada DEPOIS. Valido em Java; se a spec exige
+#      declaracao antes do uso (como em C), e erro.
