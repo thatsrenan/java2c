@@ -60,7 +60,3 @@ E20  erro : ERRO SEMANTICO                # 'i' do for oculta o 'i' local ja vis
 #      spec proibe funcoes com o mesmo nome (C nao tem sobrecarga), e erro.
 # E17: main chama dobro, declarada DEPOIS. Valido em Java; se a spec exige
 #      declaracao antes do uso (como em C), e erro.
-#E11  ?
-#E13  ?
-#E14  ?
-#E17  ?
