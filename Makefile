@@ -1,10 +1,11 @@
 # Makefile do protótipo Flex + Bison
 #
 # Disposição dos arquivos:
-#   src/main.c       -> ponto de entrada (orquestra a análise)
-#   src/lextest.c    -> harness que testa SÓ o lexer (imprime os tokens)
-#   parser/parser.y  -> gramática Bison
-#   lexer/lexer.l     -> analisador léxico Flex
+#   src/main.c         -> ponto de entrada (orquestra a análise)
+#   src/lextest.c      -> harness que testa SÓ o lexer (imprime os tokens)
+#   src/symbol_table.c -> tabela de símbolos (escopos + análise semântica)
+#   parser/parser.y    -> gramática Bison
+#   lexer/lexer.l      -> analisador léxico Flex
 #
 # Os arquivos gerados por flex/bison (lex.yy.c, parser.tab.c, parser.tab.h)
 # são colocados em build/, que é criado automaticamente e não deve ser
@@ -16,7 +17,7 @@ LEXER_DIR  = lexer
 BUILD_DIR  = build
  
 CC     = gcc
-CFLAGS = -Wall -Wno-unused-function -I$(BUILD_DIR)
+CFLAGS = -Wall -Wno-unused-function -I$(BUILD_DIR) -I$(SRC_DIR)
  
 all: protoparser lextest
  
@@ -32,9 +33,11 @@ $(BUILD_DIR)/parser.tab.c $(BUILD_DIR)/parser.tab.h: $(PARSER_DIR)/parser.y | $(
 $(BUILD_DIR)/lex.yy.c: $(LEXER_DIR)/lexer.l $(BUILD_DIR)/parser.tab.h
 	flex -o $(BUILD_DIR)/lex.yy.c $(LEXER_DIR)/lexer.l
  
-protoparser: $(BUILD_DIR)/parser.tab.c $(BUILD_DIR)/lex.yy.c $(SRC_DIR)/main.c
+protoparser: $(BUILD_DIR)/parser.tab.c $(BUILD_DIR)/lex.yy.c \
+             $(SRC_DIR)/main.c $(SRC_DIR)/symbol_table.c $(SRC_DIR)/symbol_table.h
 	$(CC) $(CFLAGS) -o protoparser \
 		$(SRC_DIR)/main.c \
+		$(SRC_DIR)/symbol_table.c \
 		$(BUILD_DIR)/parser.tab.c \
 		$(BUILD_DIR)/lex.yy.c
  
@@ -75,6 +78,12 @@ test-lexico: protoparser
 # ficaram como esperado. Sai com codigo 1 se algum divergir.
 test-check: lextest
 	@bash tests/check.sh ./lextest examples/lexico
+
+# Confere o parser + tabela de simbolos contra examples/escopo/esperado.txt.
+# Um caso 'ok' precisa ser aceito; um caso 'erro' precisa falhar com
+# "ERRO SEMANTICO" (e nao com erro de sintaxe).
+test-escopo-check: protoparser
+	@bash tests/check_escopo.sh ./protoparser examples/escopo
  
 # Mesma ideia para examples/escopo/*.java. Hoje isso so exercita o parser
 # estrutural (o prototipo ainda nao faz checagem de escopo/semantica), mas
@@ -102,4 +111,4 @@ test-all-save: protoparser lextest
 clean:
 	rm -rf protoparser lextest $(BUILD_DIR)
  
-.PHONY: all test test-tokens test-lexico test-check test-escopo test-all-save clean
+.PHONY: all test test-tokens test-lexico test-check test-escopo test-escopo-check test-all-save clean
