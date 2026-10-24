@@ -276,22 +276,58 @@ static Symbol *lookup_variable(const char *name) {
     return symbol;
 }
 
-static Symbol *lookup_function(const char *name, int argc) {
-    Symbol *symbol = st_lookup_global(name);
+/* Pilha de chamadas em andamento (uma chamada pode conter outra: f(g(1))) */
+#define MAX_CALL_DEPTH 64
+typedef struct {
+    Symbol *fn;   /* funcao sendo chamada (NULL se nao foi declarada) */
+    int     argc; /* quantos argumentos ja foram lidos */
+} CallFrame;
+static CallFrame call_stack[MAX_CALL_DEPTH];
+static int call_depth = 0;
 
+/* Chamado logo apos "nome(": procura a funcao e empilha. */
+static void call_begin(const char *name) {
+    Symbol *symbol = st_lookup_global(name);
     if (!symbol) {
         semantic_error("a funcao '%s' nao foi declarada antes do uso", name);
-        return NULL;
-    }
-    if (symbol->kind != SYM_FUNCTION) {
+    } else if (symbol->kind != SYM_FUNCTION) {
         semantic_error("'%s' nao e uma funcao", name);
-        return NULL;
+        symbol = NULL;
     }
-    if (symbol->param_count != argc) {
-        semantic_error("a funcao '%s' espera %d argumento(s), mas recebeu %d",
-                       name, symbol->param_count, argc);
+    if (call_depth < MAX_CALL_DEPTH) {
+        call_stack[call_depth].fn = symbol;
+        call_stack[call_depth].argc = 0;
     }
-    return symbol;
+    call_depth++;
+}
+
+/* Chamado a cada argumento lido: confere o tipo contra o parametro. */
+static void call_arg(DataType type) {
+    if (call_depth == 0 || call_depth > MAX_CALL_DEPTH) return;
+    CallFrame *frame = &call_stack[call_depth - 1];
+    int index = frame->argc++;
+    if (frame->fn && index < frame->fn->param_count &&
+        !is_assignable(frame->fn->param_types[index], type)) {
+        semantic_error("argumento %d de '%s': esperado %s, mas recebeu %s",
+                       index + 1, frame->fn->name,
+                       st_type_name(frame->fn->param_types[index]),
+                       st_type_name(type));
+    }
+}
+
+/* Chamado no ")": confere a quantidade, desempilha e devolve a funcao. */
+static Symbol *call_end(void) {
+    Symbol *fn = NULL;
+    call_depth--;
+    if (call_depth >= 0 && call_depth < MAX_CALL_DEPTH) {
+        CallFrame *frame = &call_stack[call_depth];
+        fn = frame->fn;
+        if (fn && frame->argc != fn->param_count) {
+            semantic_error("a funcao '%s' espera %d argumento(s), mas recebeu %d",
+                           fn->name, fn->param_count, frame->argc);
+        }
+    }
+    return fn;
 }
 %}
 
@@ -556,9 +592,9 @@ assign_stmt:
     ;
 
 call_stmt:
-        IDENTIFIER LPAREN args_opt RPAREN SEMICOLON
+        IDENTIFIER LPAREN { call_begin($1); } args_opt RPAREN SEMICOLON
         {
-            lookup_function($1, $3);
+            call_end();
             printf("   [chamada] %s(...)\n", $1);
         }
     ;
@@ -794,6 +830,7 @@ arg_list:
             if ($1 == TYPE_VOID) {
                 semantic_error("nao e possivel passar uma expressao void como argumento");
             }
+            call_arg($1);
             $$ = 1;
         }
     |   arg_list COMMA expr
@@ -801,6 +838,7 @@ arg_list:
             if ($3 == TYPE_VOID) {
                 semantic_error("nao e possivel passar uma expressao void como argumento");
             }
+            call_arg($3);
             $$ = $1 + 1;
         }
     ;
@@ -905,9 +943,9 @@ expr:
             Symbol *symbol = lookup_variable($1);
             $$ = symbol ? symbol->type : TYPE_UNKNOWN;
         }
-    |   IDENTIFIER LPAREN args_opt RPAREN
+    |   IDENTIFIER LPAREN { call_begin($1); } args_opt RPAREN
         {
-            Symbol *symbol = lookup_function($1, $3);
+            Symbol *symbol = call_end();
             $$ = symbol ? symbol->type : TYPE_UNKNOWN;
         }
     |   INTEGER_LITERAL
