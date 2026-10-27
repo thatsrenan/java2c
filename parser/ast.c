@@ -3,6 +3,7 @@
 #include "ast.h"
 
 Node *ast_root = NULL;
+int   ast_print_lines = 0;
 
 /* ================= Construcao ================= */
 
@@ -180,10 +181,11 @@ static void print_header(Node *n) {
     case NODE_BLOCK:      printf("BLOCK"); break;
     case NODE_PARAM:      printf("PARAM %s %s", type_name(n->decl_type), n->name); break;
     case NODE_METHOD:     printf("METHOD %s %s", type_name(n->decl_type), n->name); break;
-    case NODE_CLASS:      printf("CLASS %s", n->name); break;
+    case NODE_CLASS:      printf("CLASS %s", n->name ? n->name : "(sem classe)"); break;
     }
     /* depois do semantico, mostra o tipo descoberto nas expressoes */
     if (n->type != TYPE_UNKNOWN && n->kind != NODE_STR) printf("  : %s", type_name(n->type));
+    if (ast_print_lines) printf("  @%d", n->line);
     printf("\n");
 }
 

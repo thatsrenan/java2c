@@ -21,8 +21,9 @@ extern char *yytext;
 extern int yylineno;
 extern int had_lexical_error;
 
-/* Normalmente definido em parser.tab.c; aqui o parser nao e linkado. */
+/* Normalmente definidos em parser.tab.c; aqui o parser nao e linkado. */
 YYSTYPE yylval;
+YYLTYPE yylloc;
 
 static const char *token_name(int t) {
     switch (t) {

@@ -1,9 +1,9 @@
 #ifndef AST_H
 #define AST_H
 
-// Tipos da linguagem
-// TYPE_UNKNOWN vem primeiro de proposito: new_node usa calloc, entao todo
-// no nasce com type = TYPE_UNKNOWN ate o semantico preencher.
+/* Tipos da linguagem
+ * TYPE_UNKNOWN vem primeiro de proposito: new_node usa calloc, entao todo
+ * no nasce com type = TYPE_UNKNOWN ate o semantico preencher.
  * TYPE_STRING NAO e tipo de variavel (spec 1.4): so descreve o literal
  * de string do println. */
 typedef enum {
@@ -62,8 +62,9 @@ typedef enum {
     NODE_CLASS
 } NodeKind;
 
-// Convencoes dos campos
- *  NODE_INT       : val.i = valor
+/* Convencoes dos campos
+ *
+ *  NODE_INT      : val.i = valor
  *  NODE_FLOAT     : val.d = valor (sufixo f/d nao e distinguido pelo lexer)
  *  NODE_CHAR      : name  = texto cru entre aspas simples (ex.: "a" ou "\n")
  *  NODE_STR       : name  = texto cru sem as aspas (so filho de NODE_PRINT)
@@ -100,6 +101,11 @@ typedef enum {
  *                    o descarta, entao main tem a = NULL)
  *  NODE_CLASS     : name = nome da classe,
  *                   a = membros (NODE_VARDECL global e NODE_METHOD, ligados por next)
+ *                   Programa sem a classe em volta ("solto"): name = NULL e
+ *                   os statements soltos ficam, na ordem, em um unico
+ *                   NODE_BLOCK membro, na posicao do primeiro deles.
+ *
+ *  NODE_CALL tambem aparece como statement (chamada seguida de ';').
  *
  *  next = proximo irmao em uma lista (statements, membros, parametros,
  *         argumentos). Nunca e filho estrutural.
@@ -127,7 +133,7 @@ typedef struct Node {
 Node *new_node(NodeKind kind, int line);
 Node *append(Node *list, Node *n);
 
-//  Construtores auxiliares (deixam as acoes do Bison curtas)
+/* Construtores auxiliares (deixam as acoes do Bison curtas).
  * Os que recebem 'char *' ASSUMEM A POSSE da string (nao fazem strdup). */
 Node *new_int(long v, int line);
 Node *new_real(double v, int line);
@@ -154,5 +160,6 @@ const char *type_name(Type t);
 const char *op_name(OpKind op);
 
 extern Node *ast_root;
+extern int   ast_print_lines;   /* != 0: print_ast mostra "@linha" em cada no */
 
 #endif
