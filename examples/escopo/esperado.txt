@@ -1,5 +1,5 @@
-# Resultado esperado do PARSER COMPLETO (modo "parser" de tests/check.sh) para
-# cada caso de examples/escopo.
+# Resultado esperado do PARSER COMPLETO (tests/check_parser.sh, alvo
+# 'make test-escopo-check') para cada caso de examples/escopo.
 #
 #   NOME  ok                          programa deve ser ACEITO (exit code 0)
 #   NOME  erro : ERRO SEMANTICO       programa deve ser REJEITADO por uma regra
@@ -8,9 +8,8 @@
 #
 # CONVENCAO: erros de escopo/semantica devem ser impressos como
 #     ERRO SEMANTICO na linha N: <descricao>
-# Exigir esse trecho evita que um caso passe "por acidente": hoje E05 e E07 sao
-# rejeitados, mas por ERRO DE SINTAXE (o parser ainda nao aceita funcoes), e
-# isso NAO conta como a rejeicao de escopo esperada.
+# Exigir esse trecho evita que um caso passe "por acidente": um caso rejeitado
+# por ERRO DE SINTAXE NAO conta como a rejeicao de escopo esperada.
 #
 # As expectativas seguem as regras de escopo do Java:
 #  - uma variavel local so existe dentro do bloco onde foi declarada;

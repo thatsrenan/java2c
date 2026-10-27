@@ -1,0 +1,17 @@
+CLASS (sem classe)  @1
+  FIELD(static) int g  @1
+    INT 1  @1
+  BLOCK  @2
+    VARDECL int x  @2
+      ID g  @2
+    ASSIGN x +=  @6
+      INT 2  @6
+    CALL f  @7
+      args:
+        (vazio)
+  METHOD void f  @3
+    params:
+      (vazio)
+    corpo:
+      BLOCK  @3
+        INCDEC g (pos)++  @4

@@ -1,0 +1,45 @@
+CLASS (sem classe)  @1
+  BLOCK  @1
+    VARDECL int a  @1
+      BINOP +  @1
+        INT 1  @1
+        BINOP *  @1
+          INT 2  @1
+          INT 3  @1
+    VARDECL int b  @2
+      BINOP -  @2
+        BINOP -  @2
+          ID a  @2
+          INT 2  @2
+        INT 1  @2
+    VARDECL boolean c  @3
+      BINOP ||  @3
+        BINOP &&  @3
+          UNARY !  @3
+            BOOL true  @3
+          BINOP <  @3
+            ID a  @3
+            ID b  @3
+        BOOL false  @3
+    VARDECL int d  @4
+      BINOP *  @4
+        UNARY -(unario)  @4
+          ID a  @4
+        BINOP +  @4
+          ID b  @4
+          INT 1  @4
+    VARDECL double e  @5
+      BINOP /  @5
+        CAST (double)  @5
+          ID a  @5
+        INT 2  @5
+    VARDECL int f  @6
+      CAST (int)  @6
+        UNARY -(unario)  @6
+          ID e  @6
+    VARDECL boolean g  @7
+      BINOP !=  @7
+        BINOP ==  @7
+          ID a  @7
+          ID b  @7
+        ID c  @7
