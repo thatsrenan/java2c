@@ -47,6 +47,9 @@
 #include <stdarg.h>
 #include <string.h>
 
+/* ast.h tambem vem do %code requires, mas este bloco sai antes dele no
+ * parser.tab.c e as funcoes abaixo ja usam Type/Node/OpKind. */
+#include "ast.h"
 #include "symbol_table.h"
 
 int yylex(void);
@@ -162,7 +165,7 @@ static DataType dt_of(Node *n) {
     if (!n) return ST_TYPE_UNKNOWN;
     switch (n->kind) {
         case NODE_INT:   return ST_TYPE_INT;
-        case NODE_FLOAT: return ST_TYPE_DOUBLE;
+        case NODE_FLOAT: return n->decl_type == TYPE_FLOAT ? ST_TYPE_FLOAT : ST_TYPE_DOUBLE;
         case NODE_CHAR:  return ST_TYPE_CHAR;
         case NODE_BOOL:  return ST_TYPE_BOOLEAN;
         case NODE_STR:   return ST_TYPE_STRING;
@@ -396,6 +399,7 @@ static Node *add_top_item(Node *members, Node *item);
 %union {
     int     ival;
     double  dval;
+    struct { double v; int is_float; } rval;   /* literal real e sufixo f/F */
     char   *sval;
     Node   *node;
     Type    tval;
@@ -410,7 +414,7 @@ static Node *add_top_item(Node *members, Node *item);
 /* Literais e identificadores */
 %token <sval> IDENTIFIER
 %token <ival> INTEGER_LITERAL
-%token <dval> REAL_LITERAL
+%token <rval> REAL_LITERAL
 %token <sval> CHAR_LITERAL
 %token <sval> STRING_LITERAL
 %token TRUE FALSE
@@ -427,7 +431,7 @@ static Node *add_top_item(Node *members, Node *item);
 
 %type <tval>  type
 %type <opval> assign_op
-%type <node>  class_decl member_list member top_list top_item
+%type <node>  class_decl member_list member top_list top_first top_item
 %type <node>  field_decl method_decl method_sig param_opt param_list param
 %type <node>  stmt_list stmt block vardecl assign_stmt increment_stmt
 %type <node>  call_stmt call arg_opt arg_list print_stmt print_arg
@@ -460,11 +464,11 @@ program:
             ast_root = $1;
             if (show_symbol_table) st_print(stdout);
         }
-    |   { st_enter_scope(); current_return_type = ST_TYPE_VOID; } top_list
+    |   top_list
         {
             if (show_symbol_table) st_print(stdout);
             st_exit_scope();
-            ast_root = new_class(NULL, $2, 1);
+            ast_root = new_class(NULL, $1, 1);
         }
     |   /* vazio */
         { ast_root = new_class(NULL, NULL, 1); }
@@ -494,10 +498,31 @@ member:
     |   method_decl
     ;
 
-/* programa sem a classe em volta: membros e statements em qualquer ordem */
+/*
+ * Programa sem a classe em volta: membros e statements em qualquer ordem.
+ *
+ * O escopo do main implícito (top_begin) precisa ser aberto antes do
+ * primeiro item. Se esse item começa com PUBLIC, abrir o escopo logo no
+ * início conflitaria com "public class": por isso o PUBLIC é lido antes
+ * de top_begin, e o STATIC seguinte decide que é um método solto.
+ */
 top_list:
-        top_item                  { loose_block = NULL; $$ = add_top_item(NULL, $1); }
+        top_begin top_first       { loose_block = NULL; $$ = add_top_item(NULL, $2); }
+    |   PUBLIC top_begin STATIC method_sig
+                                  { loose_block = NULL; $$ = add_top_item(NULL, $4); }
     |   top_list top_item         { $$ = add_top_item($1, $2); }
+    ;
+
+top_begin:
+        /* vazio */
+        { st_enter_scope(); current_return_type = ST_TYPE_VOID; }
+    ;
+
+/* primeiro item de um programa solto: top_item sem o "public static ..." */
+top_first:
+        field_decl
+    |   STATIC method_sig         { $$ = $2; }
+    |   stmt
     ;
 
 top_item:
@@ -1054,7 +1079,11 @@ expr:
             $$ = new_ident($1, @1.first_line);
         }
     |   INTEGER_LITERAL          { $$ = new_int($1, @1.first_line); }
-    |   REAL_LITERAL             { $$ = new_real($1, @1.first_line); }
+    |   REAL_LITERAL
+        {
+            $$ = new_real($1.v, @1.first_line);
+            $$->decl_type = $1.is_float ? TYPE_FLOAT : TYPE_DOUBLE;
+        }
     |   CHAR_LITERAL             { $$ = new_char($1, @1.first_line); }
     |   TRUE                     { $$ = new_bool(1, @1.first_line); }
     |   FALSE                    { $$ = new_bool(0, @1.first_line); }
