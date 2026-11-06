@@ -65,7 +65,8 @@ typedef enum {
 /* Convencoes dos campos
  *
  *  NODE_INT      : val.i = valor
- *  NODE_FLOAT     : val.d = valor (sufixo f/d nao e distinguido pelo lexer)
+ *  NODE_FLOAT     : val.d = valor, decl_type = TYPE_FLOAT (sufixo f/F)
+ *                   ou TYPE_DOUBLE (sem sufixo ou d/D)
  *  NODE_CHAR      : name  = texto cru entre aspas simples (ex.: "a" ou "\n")
  *  NODE_STR       : name  = texto cru sem as aspas (so filho de NODE_PRINT)
  *  NODE_BOOL      : val.i = 1 (true) ou 0 (false)

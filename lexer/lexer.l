@@ -74,7 +74,8 @@ static int real_value_ok(void) {
         lex_error("literal real '%s' fora do intervalo.", yytext);
         return 0;
     }
-    yylval.dval = d;
+    yylval.rval.v = d;
+    yylval.rval.is_float = is_float;
     return 1;
 }
 %}
