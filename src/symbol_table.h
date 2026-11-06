@@ -23,19 +23,22 @@
 
 #include <stdio.h>
 
-/* Tipos do subconjunto. TYPE_STRING existe apenas para reconhecer o
+/* Tipos do subconjunto. ST_TYPE_STRING existe apenas para reconhecer o
  * parametro convencional "String[] args" do main, que depois nao pode ser
- * usado como um tipo comum. TYPE_UNKNOWN evita cascatas de erro quando uma
- * expressao ja invalida e usada em outra verificacao. */
+ * usado como um tipo comum. ST_TYPE_UNKNOWN evita cascatas de erro quando uma
+ * expressao ja invalida e usada em outra verificacao.
+ *
+ * O prefixo ST_ evita colisao com os enumeradores TYPE_* de parser/ast.h,
+ * que descrevem os mesmos tipos mas com valores numericos diferentes. */
 typedef enum {
-    TYPE_INT = 0,
-    TYPE_FLOAT,
-    TYPE_DOUBLE,
-    TYPE_BOOLEAN,
-    TYPE_CHAR,
-    TYPE_VOID,
-    TYPE_STRING,
-    TYPE_UNKNOWN
+    ST_TYPE_INT = 0,
+    ST_TYPE_FLOAT,
+    ST_TYPE_DOUBLE,
+    ST_TYPE_BOOLEAN,
+    ST_TYPE_CHAR,
+    ST_TYPE_VOID,
+    ST_TYPE_STRING,
+    ST_TYPE_UNKNOWN
 } DataType;
 
 /* Categoria do simbolo armazenado. */

@@ -1,0 +1,79 @@
+CLASS Main  @1
+  METHOD int f  @2
+    params:
+      PARAM int n  @2
+      PARAM char c  @2
+    corpo:
+      BLOCK  @2
+        IF  @3
+          cond:
+            BINOP >  @3
+              ID n  @3
+              INT 0  @3
+          then:
+            BLOCK  @3
+              RETURN  @4
+                ID n  @4
+          else:
+            IF  @5
+              cond:
+                BINOP ==  @5
+                  ID n  @5
+                  INT 0  @5
+              then:
+                BLOCK  @5
+                  RETURN  @6
+                    INT 0  @6
+              else:
+                BLOCK  @7
+                  RETURN  @8
+                    UNARY -(unario)  @8
+                      ID n  @8
+  METHOD void main  @12
+    params:
+      (vazio)
+    corpo:
+      BLOCK  @12
+        VARDECL int i  @13
+        FOR  @14
+          init:
+            ASSIGN i =  @14
+              INT 0  @14
+          cond:
+            BINOP <  @14
+              ID i  @14
+              INT 3  @14
+          update:
+            INCDEC i ++(pre)  @14
+          corpo:
+            BLOCK  @14
+              CONTINUE  @15
+        FOR  @17
+          init:
+            (vazio)
+          cond:
+            (vazio)
+          update:
+            (vazio)
+          corpo:
+            BLOCK  @17
+              BREAK  @18
+        WHILE  @20
+          cond:
+            BINOP !=  @20
+              ID i  @20
+              INT 0  @20
+          corpo:
+            BLOCK  @20
+              ASSIGN i -=  @21
+                INT 1  @21
+        PRINT  @23
+          CHAR 'x'  @23
+        PRINT  @24
+          REAL 2.5  @24
+        PRINT  @25
+          CALL f  @25
+            args:
+              ID i  @25
+              CHAR 'y'  @26
+        RETURN  @27

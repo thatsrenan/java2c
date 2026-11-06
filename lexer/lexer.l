@@ -49,6 +49,11 @@ int had_lexical_error = 0;
 */
 static int comment_start_line = 0;
 
+/* Posicao de cada token para o parser (%locations), usada como linha dos
+ * nos da AST. Nenhum token reconhecido contem '\n', entao yylineno aqui ja
+ * e a linha do proprio token. */
+#define YY_USER_ACTION yylloc.first_line = yylloc.last_line = yylineno;
+
 static void lex_error(const char *fmt, const char *arg) {
     fprintf(stderr, "ERRO LEXICO na linha %d: ", yylineno);
     fprintf(stderr, fmt, arg);

@@ -217,13 +217,13 @@ void st_mark_initialized(Symbol *symbol) {
 
 const char *st_type_name(DataType type) {
     switch (type) {
-    case TYPE_INT:     return "int";
-    case TYPE_FLOAT:   return "float";
-    case TYPE_DOUBLE:  return "double";
-    case TYPE_BOOLEAN: return "boolean";
-    case TYPE_CHAR:    return "char";
-    case TYPE_VOID:    return "void";
-    case TYPE_STRING:  return "String";
+    case ST_TYPE_INT:     return "int";
+    case ST_TYPE_FLOAT:   return "float";
+    case ST_TYPE_DOUBLE:  return "double";
+    case ST_TYPE_BOOLEAN: return "boolean";
+    case ST_TYPE_CHAR:    return "char";
+    case ST_TYPE_VOID:    return "void";
+    case ST_TYPE_STRING:  return "String";
     default:           return "desconhecido";
     }
 }
