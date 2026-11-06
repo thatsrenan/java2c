@@ -1,0 +1,35 @@
+# Resultado esperado do PARSER (tests/check_parser.sh) para cada caso de
+# examples/sintaxe. Aqui so se confere a gramatica: nenhum caso depende de
+# analise semantica.
+#
+#   NOME  ok                 programa deve ser ACEITO (exit code 0)
+#   NOME  erro : TEXTO       programa deve ser REJEITADO e a saida
+#                            (stdout+stderr) deve conter TEXTO
+
+# ---------- validos ----------
+S01  ok                      # programa completo da spec (secao 16.1)
+S02  ok                      # classe sem 'public' e sem membros
+S03  ok                      # main sem o parametro String[] args
+S04  ok                      # varios parametros, chamadas aninhadas em expressoes
+S05  ok                      # campo static sem inicializador, metodo 'public static', chamada como statement
+S06  ok                      # casts explicitos, inclusive sobre unario e expressao
+S07  ok                      # else if, while/for/do-while, break/continue, for(;;)
+S08  ok                      # println com int, variavel, real, char, boolean, string e expressao
+S09  ok                      # comentarios de linha e de bloco
+
+# ---------- invalidos ----------
+S10  erro : o tipo String nao e suportado          # String como tipo de variavel
+S11  erro : so e permitido como parametro de main  # String[] fora do main
+S12  erro : ERRO DE SINTAXE                         # campo sem static
+S13  erro : ERRO DE SINTAXE                         # metodo sem static
+S14  erro : ERRO DE SINTAXE                         # void como tipo de variavel
+S15  erro : ERRO DE SINTAXE                         # literal de string fora do println
+S16  erro : ERRO DE SINTAXE                         # metodo dentro de metodo
+S17  erro : ERRO DE SINTAXE                         # array
+S18  erro : ERRO DE SINTAXE                         # falta ';' no campo
+S19  erro : ERRO DE SINTAXE                         # statement solto no corpo da classe
+S20  erro : ERRO DE SINTAXE                         # virgula sobrando na chamada
+S21  erro : ERRO DE SINTAXE                         # mais de uma classe
+S22  erro : ERRO DE SINTAXE                         # if sem bloco (a spec exige { })
+S23  erro : o tipo String nao e suportado          # String como tipo de retorno
+S24  erro : ERRO DE SINTAXE                         # cast sem operando

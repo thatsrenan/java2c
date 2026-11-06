@@ -2,3 +2,6 @@
 
 build/
 protoparser
+lextest
+asttest
+protoparser-san
