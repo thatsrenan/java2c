@@ -3,16 +3,16 @@
  *
  * Ponto de entrada do compilador. Responsável por abrir o arquivo de
  * entrada, inicializar a tabela de símbolos, disparar a análise (yyparse),
- * reportar o resultado e imprimir a AST montada pelo parser. A gramática
- * vive em parser/parser.y, o analisador léxico em lexer/lexer.l, a tabela
- * de símbolos em src/symbol_table.c e a AST em parser/ast.c.
+ * reportar o resultado e (conforme a opção) imprimir a AST ou a IR (TAC)
+ * gerada a partir da AST. A gramática vive em parser/parser.y, o
+ * analisador léxico em lexer/lexer.l, a tabela de símbolos em
+ * src/symbol_table.c, a AST em parser/ast.c e a IR em src/ir.c/src/ir_gen.c.
  *
  * Uso:
  *   ./protoparser arquivo.java
  *   ./protoparser --tabela arquivo.java   (imprime a tabela de símbolos)
- *   protoparser [--ast] [arquivo]
- *       --ast  imprime SÓ a AST, com a linha de cada nó ("@N") e sem as
- *              mensagens de início/fim; formato usado por tests/check_ast.sh
+ *   ./protoparser --ast [arquivo]         (imprime só a AST, com @linha)
+ *   ./protoparser --ir  [arquivo]         (imprime só a IR/TAC)
  */
 
 #include <stdio.h>
@@ -21,6 +21,8 @@
 
 #include "symbol_table.h"
 #include "ast.h"
+#include "ir.h"
+#include "ir_gen.h"
 
 /* Gerados por Bison a partir de parser/parser.y (ver parser.tab.h) */
 int yyparse(void);
@@ -35,11 +37,12 @@ extern int had_semantic_error;
 extern int show_symbol_table;
 
 static void usage(const char *program) {
-    fprintf(stderr, "uso: %s [--tabela|--ast] [--ajuda] [arquivo.java]\n", program);
+    fprintf(stderr, "uso: %s [--tabela|--ast|--ir] [--ajuda] [arquivo.java]\n", program);
 }
 
 int main(int argc, char **argv) {
     int only_ast = 0;
+    int only_ir = 0;
     const char *input_path = NULL;
 
     for (int i = 1; i < argc; i++) {
@@ -47,6 +50,8 @@ int main(int argc, char **argv) {
             show_symbol_table = 1;
         } else if (strcmp(argv[i], "--ast") == 0) {
             only_ast = ast_print_lines = 1;
+        } else if (strcmp(argv[i], "--ir") == 0) {
+            only_ir = 1;
         } else if (strcmp(argv[i], "--ajuda") == 0 || strcmp(argv[i], "-h") == 0) {
             usage(argv[0]);
             return 0;
@@ -69,7 +74,8 @@ int main(int argc, char **argv) {
 
     st_init();
 
-    if (!only_ast) printf("=== Prototipo Flex + Bison: iniciando analise ===\n");
+    int quiet = only_ast || only_ir;
+    if (!quiet) printf("=== Prototipo Flex + Bison: iniciando analise ===\n");
     int parse_result = yyparse();
 
     /*
@@ -79,14 +85,27 @@ int main(int argc, char **argv) {
      */
     int success = (parse_result == 0) && !had_lexical_error && !had_semantic_error;
 
+    /* Estrutura para a IR: gerada apenas quando a análise teve sucesso. */
+    IrProgram *ir_prog = NULL;
+
     if (success) {
-        if (!only_ast) printf(">> Programa reconhecido com sucesso.\n\n--- AST ---\n");
-        print_ast(ast_root, 0);
-        if (!only_ast) printf("\n=== Analise concluida sem erros ===\n");
-    } else if (!only_ast) {
+        if (only_ir) {
+            /* Modo IR: imprime somente a representação intermediária. */
+            ir_prog = ir_generate(ast_root);
+            ir_print_program(stdout, ir_prog);
+        } else if (only_ast) {
+            /* Modo AST: imprime somente a AST (com @linha). */
+            print_ast(ast_root, 0);
+        } else {
+            printf(">> Programa reconhecido com sucesso.\n\n--- AST ---\n");
+            print_ast(ast_root, 0);
+            printf("\n=== Analise concluida sem erros ===\n");
+        }
+    } else if (!quiet) {
         printf("=== Analise concluida com erros ===\n");
     }
 
+    if (ir_prog) ir_program_free(ir_prog);
     free_ast(ast_root);
     ast_root = NULL;
 

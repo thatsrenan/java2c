@@ -40,16 +40,18 @@ $(BUILD_DIR)/parser.tab.c $(BUILD_DIR)/parser.tab.h: $(PARSER_DIR)/parser.y | $(
 $(BUILD_DIR)/lex.yy.c: $(LEXER_DIR)/lexer.l $(BUILD_DIR)/parser.tab.h
 	flex -o $(BUILD_DIR)/lex.yy.c $(LEXER_DIR)/lexer.l
 
-PARSER_SRCS = $(SRC_DIR)/main.c $(SRC_DIR)/symbol_table.c $(BUILD_DIR)/parser.tab.c $(BUILD_DIR)/lex.yy.c \
-              $(PARSER_DIR)/ast.c
+PARSER_SRCS = $(SRC_DIR)/main.c $(SRC_DIR)/symbol_table.c $(SRC_DIR)/ir.c $(SRC_DIR)/ir_gen.c \
+              $(BUILD_DIR)/parser.tab.c $(BUILD_DIR)/lex.yy.c $(PARSER_DIR)/ast.c
 
-protoparser: $(PARSER_SRCS) $(PARSER_DIR)/ast.h $(SRC_DIR)/symbol_table.h
+IR_HDRS = $(SRC_DIR)/ir.h $(SRC_DIR)/ir_gen.h
+
+protoparser: $(PARSER_SRCS) $(PARSER_DIR)/ast.h $(SRC_DIR)/symbol_table.h $(IR_HDRS)
 	$(CC) $(CFLAGS) -o protoparser $(PARSER_SRCS)
 
 # Mesmo protoparser, compilado com os sanitizers: usado por test-ast-parser
 # para pegar vazamento ou acesso inválido na montagem/liberação da AST,
 # inclusive quando a análise para no meio por erro de sintaxe.
-protoparser-san: $(PARSER_SRCS) $(PARSER_DIR)/ast.h $(SRC_DIR)/symbol_table.h
+protoparser-san: $(PARSER_SRCS) $(PARSER_DIR)/ast.h $(SRC_DIR)/symbol_table.h $(IR_HDRS)
 	$(CC) $(CFLAGS) -g $(SANITIZE) -o protoparser-san $(PARSER_SRCS)
 
 # Testa só o lexer: não linka o parser, então funciona mesmo que a
