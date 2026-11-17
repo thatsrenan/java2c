@@ -121,5 +121,45 @@ make test-escopo         # mostra entrada/saída de cada caso de escopo
 ``` bash
 git checkout -b minha-feature
 ```
-
 3. Faça _commit_ e envie um _pull request_.
+
+---
+## 👥 Equipe
+<h2 align="center">JAVA2C</h2>
+
+<table align="center">
+  <!-- Primeira linha -->
+  <tr>
+    <td align="center">
+      <a href="https://github.com/CaioMota16">
+        <img src="https://github.com/CaioMota16.png" width="200px;" alt="Caio"/><br />
+        <sub><b></b></sub><br />
+        <sub>Desenvolvedor</sub>
+      </a>
+    <td align="center">
+      <a href="https://github.com/">
+        <img src="https://github.com/Flyxs.png" width="200px;" alt="Felype"/><br />
+        <sub><b>Felype</b></sub><br />
+        <sub>Desenvolvedor</sub>
+      </a>
+    </td>
+  </tr>
+
+  <!-- Segunda linha -->
+  <tr>
+    <td align="center">
+      <a href="https://github.com/isaiasmoraes694">
+        <img src="https://github.com/thatsrenan.png" width="200px;" alt="Renan "/><br />
+        <sub><b>Renan</b></sub><br />
+        <sub>Desenvolvedor</sub>
+      </a>
+    </td>
+    </td>
+    <td align="center">
+      <a href="https://github.com/VitorRoss1">
+        <img src="https://github.com/VitorRoss1.png" width="200px;" alt="Vitor"/><br />
+        <sub><b>Vitor</b></sub><br />
+        <sub>Desenvolvedor</sub>
+      </a>
+  </tr>
+
