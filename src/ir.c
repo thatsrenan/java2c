@@ -35,7 +35,6 @@ IrProgram *ir_program_new(void) {
     p->globals = NULL;
     p->funcs = NULL;
     p->label_count = 0;
-    p->temp_count = 0;
     return p;
 }
 
@@ -229,8 +228,8 @@ char *ir_new_label(IrProgram *p, const char *prefix) {
     return ir_strdup(buf);
 }
 
-int ir_new_temp(IrProgram *p) {
-    return p->temp_count++;
+int ir_new_temp(IrFunc *f) {
+    return f->temp_count++;
 }
 
 /* ===================== Emissão ===================== */
@@ -259,6 +258,22 @@ IrInstr *ir_emit(IrFunc *f, IrOpcode op) {
 
 /* ===================== Impressão ===================== */
 
+/* Imprime uma constante real com a menor quantidade de dígitos que ainda
+ * reconstrói exatamente o mesmo valor (como float ou double), e sempre
+ * com '.' ou expoente, para não ser confundida com um inteiro. */
+static void ir_print_real(FILE *out, double v, IrType type) {
+    char buf[64];
+    int is_float = (type == TYPE_FLOAT);
+    int max_prec = is_float ? 9 : 17;
+    for (int prec = 1; prec <= max_prec; prec++) {
+        snprintf(buf, sizeof buf, "%.*g", prec, v);
+        double back = strtod(buf, NULL);
+        if (is_float ? ((float)back == (float)v) : (back == v)) break;
+    }
+    if (!strpbrk(buf, ".eEn")) strcat(buf, ".0"); /* 'n': nan/inf */
+    fputs(buf, out);
+}
+
 static void ir_print_operand(FILE *out, const IrOperand *op) {
     switch (op->kind) {
     case IR_OP_EMPTY:
@@ -274,7 +289,7 @@ static void ir_print_operand(FILE *out, const IrOperand *op) {
         break;
     case IR_OP_CONST:
         if (op->type == TYPE_FLOAT || op->type == TYPE_DOUBLE) {
-            fprintf(out, "%g", op->value.d);
+            ir_print_real(out, op->value.d, op->type);
         } else if (op->type == TYPE_BOOLEAN) {
             fputs(op->value.i ? "true" : "false", out);
         } else if (op->type == TYPE_CHAR) {
@@ -385,6 +400,24 @@ static void ir_print_instr(FILE *out, const IrInstr *ins) {
     }
 }
 
+/* Lista os temporários da função com seus tipos (o tipo vem da
+ * instrução que define cada um), ex.: "temps: t0: int, t1: double". */
+static void ir_print_temps(FILE *out, const IrFunc *f) {
+    if (f->temp_count <= 0) return;
+    IrType *types = ir_calloc((size_t)f->temp_count, sizeof *types);
+    for (const IrInstr *ins = f->first; ins; ins = ins->next) {
+        if (ins->res.kind == IR_OP_TEMP && ins->res.id >= 0 &&
+            ins->res.id < f->temp_count && types[ins->res.id] == TYPE_UNKNOWN)
+            types[ins->res.id] = ins->res.type;
+    }
+    fputs("    temps: ", out);
+    for (int i = 0; i < f->temp_count; i++) {
+        fprintf(out, "t%d: %s%s", i, ir_type_name(types[i]),
+                i + 1 < f->temp_count ? ", " : "\n");
+    }
+    free(types);
+}
+
 void ir_print_program(FILE *out, const IrProgram *p) {
     if (!out) out = stdout;
     if (!p) {
@@ -413,6 +446,7 @@ void ir_print_program(FILE *out, const IrProgram *p) {
             if (pr->next) fputs(", ", out);
         }
         fprintf(out, ") -> %s\n", ir_type_name(f->ret_type));
+        ir_print_temps(out, f);
         for (IrInstr *ins = f->first; ins; ins = ins->next) {
             ir_print_instr(out, ins);
         }

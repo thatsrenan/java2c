@@ -137,7 +137,8 @@ typedef struct IrFunc {
     IrParam       *params;      /* lista de parâmetros, em ordem */
     IrInstr       *first;       /* primeira instrução */
     IrInstr       *last;        /* última instrução (para anexar em O(1)) */
-    int            temp_count;  /* quantidade de temporários usados */
+    int            temp_count;  /* quantidade de temporários usados (t0..tN-1);
+                                 * a numeração recomeça em cada função */
     struct IrFunc *next;
 } IrFunc;
 
@@ -146,7 +147,6 @@ typedef struct {
     IrGlobal *globals;
     IrFunc   *funcs;
     int       label_count;  /* contador global para rótulos únicos */
-    int       temp_count;   /* contador global para temporários únicos */
 } IrProgram;
 
 /* ===================== API de construção ===================== */
@@ -175,11 +175,13 @@ IrOperand ir_const_real(double v, IrType type);   /* float/double */
 IrOperand ir_label(const char *name);
 IrOperand ir_func_ref(const char *name);
 
-/* Gera nomes/ids únicos no contexto do programa. O chamador é dono da
- * string retornada por ir_new_label (deve liberá-la quando não precisar
- * mais, por exemplo após construir o operando/rótulo). */
+/* Gera nomes únicos de rótulo no contexto do programa. O chamador é dono
+ * da string retornada (deve liberá-la após construir o operando/rótulo). */
 char *ir_new_label(IrProgram *p, const char *prefix);
-int   ir_new_temp(IrProgram *p);
+
+/* Novo temporário da função: os ids são locais a cada função (t0, t1,
+ * ...), de modo que f->temp_count é exatamente quantos ela usa. */
+int   ir_new_temp(IrFunc *f);
 
 /* Emite (anexa) uma instrução no fim da função e a retorna. */
 IrInstr *ir_emit(IrFunc *f, IrOpcode op);
