@@ -1,5 +1,6 @@
 === IR (TAC) ===
 func main() -> void
+    temps: t0: int, t1: int, t2: int, t3: int, t4: boolean, t5: boolean, t6: boolean, t7: boolean, t8: int, t9: int, t10: int, t11: double, t12: double, t13: double, t14: int, t15: boolean, t16: boolean
     t0 = 2 * 3
     t1 = 1 + t0
     a = t1
