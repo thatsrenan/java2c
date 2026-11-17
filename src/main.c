@@ -6,7 +6,8 @@
  * reportar o resultado e (conforme a opção) imprimir a AST ou a IR (TAC)
  * gerada a partir da AST. A gramática vive em parser/parser.y, o
  * analisador léxico em lexer/lexer.l, a tabela de símbolos em
- * src/symbol_table.c, a AST em parser/ast.c e a IR em src/ir.c/src/ir_gen.c.
+ * src/symbol_table.c, a análise de fluxo em src/semantic_flow.c, a AST em
+ * parser/ast.c e a IR em src/ir.c/src/ir_gen.c.
  *
  * Uso:
  *   ./protoparser arquivo.java
@@ -23,6 +24,7 @@
 #include "ast.h"
 #include "ir.h"
 #include "ir_gen.h"
+#include "semantic_flow.h"
 
 /* Gerados por Bison a partir de parser/parser.y (ver parser.tab.h) */
 int yyparse(void);
@@ -77,6 +79,15 @@ int main(int argc, char **argv) {
     int quiet = only_ast || only_ir;
     if (!quiet) printf("=== Prototipo Flex + Bison: iniciando analise ===\n");
     int parse_result = yyparse();
+
+    /*
+     * Com a AST completa, a análise de fluxo verifica o que depende do
+     * programa inteiro: código inalcançável, retorno em todos os caminhos
+     * e variáveis locais inicializadas antes do uso.
+     */
+    if (parse_result == 0 && !had_lexical_error && ast_root) {
+        if (semantic_flow_check(ast_root) > 0) had_semantic_error = 1;
+    }
 
     /*
      * A análise só é considerada bem-sucedida se o parser não reportou

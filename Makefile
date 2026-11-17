@@ -41,9 +41,10 @@ $(BUILD_DIR)/lex.yy.c: $(LEXER_DIR)/lexer.l $(BUILD_DIR)/parser.tab.h
 	flex -o $(BUILD_DIR)/lex.yy.c $(LEXER_DIR)/lexer.l
 
 PARSER_SRCS = $(SRC_DIR)/main.c $(SRC_DIR)/symbol_table.c $(SRC_DIR)/ir.c $(SRC_DIR)/ir_gen.c \
+              $(SRC_DIR)/const_eval.c $(SRC_DIR)/semantic_flow.c \
               $(BUILD_DIR)/parser.tab.c $(BUILD_DIR)/lex.yy.c $(PARSER_DIR)/ast.c
 
-IR_HDRS = $(SRC_DIR)/ir.h $(SRC_DIR)/ir_gen.h
+IR_HDRS = $(SRC_DIR)/ir.h $(SRC_DIR)/ir_gen.h $(SRC_DIR)/const_eval.h $(SRC_DIR)/semantic_flow.h
 
 protoparser: $(PARSER_SRCS) $(PARSER_DIR)/ast.h $(SRC_DIR)/symbol_table.h $(IR_HDRS)
 	$(CC) $(CFLAGS) -o protoparser $(PARSER_SRCS)
