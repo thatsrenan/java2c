@@ -16,6 +16,15 @@
  *
  * Esta IR é deliberadamente simples e didática, pensada para o
  * subconjunto procedural suportado pelo projeto.
+ *
+ * Garantias para a geração de C:
+ *   - toda global tem valor inicial (o padrão do tipo, se o Java não der
+ *     um; inicializadores não constantes viram código no início do main);
+ *   - cada função lista seus parâmetros, locais e temporários com tipo;
+ *   - dentro de uma função, cada nome de variável se refere a uma única
+ *     entidade: não há ocultação (shadowing) entre locais, parâmetros e
+ *     globais, e nenhum nome colide com temporários (tN), com palavras
+ *     reservadas de C ou com nomes de funções.
  */
 
 #include <stdio.h>
@@ -121,6 +130,15 @@ typedef struct IrParam {
     struct IrParam *next;
 } IrParam;
 
+/* Variável local de uma função na IR (nome único na função + tipo).
+ * Locais com o mesmo nome em blocos diferentes do Java, ou que ocultam
+ * uma global, recebem nomes distintos (ex.: y, y_1). */
+typedef struct IrLocal {
+    char           *name;
+    IrType          type;
+    struct IrLocal *next;
+} IrLocal;
+
 /* Declaração de variável global/campo static. */
 typedef struct IrGlobal {
     char            *name;
@@ -135,6 +153,7 @@ typedef struct IrFunc {
     char          *name;
     IrType         ret_type;
     IrParam       *params;      /* lista de parâmetros, em ordem */
+    IrLocal       *locals;      /* variáveis locais, na ordem de declaração */
     IrInstr       *first;       /* primeira instrução */
     IrInstr       *last;        /* última instrução (para anexar em O(1)) */
     int            temp_count;  /* quantidade de temporários usados (t0..tN-1);
@@ -160,6 +179,9 @@ IrFunc *ir_program_add_func(IrProgram *p, const char *name, IrType ret_type);
 
 /* Adiciona um parâmetro ao final da lista de parâmetros da função. */
 void ir_func_add_param(IrFunc *f, const char *name, IrType type);
+
+/* Adiciona uma variável local ao final da lista de locais da função. */
+void ir_func_add_local(IrFunc *f, const char *name, IrType type);
 
 /* Adiciona/atualiza uma variável global. 'init' deve ser um operando
  * constante (IR_OP_CONST) ou EMPTY se não houver inicializador. */

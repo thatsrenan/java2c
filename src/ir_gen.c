@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 #include "symbol_table.h"
+#include "const_eval.h"
 
 /*
  * ir_gen.c
@@ -22,6 +23,8 @@
  * - Tipos: o parser não preenche n->type das expressões, então o
  *   gerador mantém o próprio ambiente (nome -> tipo) de globais,
  *   parâmetros e locais, e deduz o tipo de cada expressão (expr_type).
+ * - Nomes: cada variável recebe um nome na IR único dentro da função
+ *   (ver unique_name), de modo que a IR não tem ocultação de nomes.
  */
 
 /* ===================== Contexto de geração ===================== */
@@ -32,12 +35,23 @@ typedef struct LoopCtx {
     struct LoopCtx  *prev;
 } LoopCtx;
 
-/* Associação nome -> tipo. 'name' é emprestado da AST (não é liberado). */
+/* Associação nome Java -> (nome na IR, tipo). 'name' é emprestado da
+ * AST e 'ir_name' da própria IR (IrGlobal/IrParam/IrLocal); nenhum dos
+ * dois é liberado aqui. */
 typedef struct VarBind {
     const char     *name;
+    const char     *ir_name;
     IrType          type;
     struct VarBind *next;
 } VarBind;
+
+/* Nome de função Java -> nome na IR (difere só se colidir com palavra
+ * reservada de C ou com o padrão dos temporários). */
+typedef struct FuncName {
+    const char      *name;
+    char            *ir_name;
+    struct FuncName *next;
+} FuncName;
 
 /* Global cujo inicializador não é constante: vira código no início do
  * main (ou de __init_globals, se o programa não tiver main). */
@@ -52,6 +66,7 @@ typedef struct {
     LoopCtx     *loop;       /* topo da pilha de laços (para break/continue) */
     VarBind     *locals;     /* pilha de parâmetros/locais visíveis */
     VarBind     *globals;    /* campos static */
+    FuncName    *funcs;      /* nomes de todas as funções do programa */
     PendingInit *pending;    /* inicializações de globais a emitir */
     int          inits_done; /* 1 depois que 'pending' foi emitido */
 } GenCtx;
@@ -77,9 +92,11 @@ static char *xstrdup(const char *s) {
 
 /* ===================== Ambiente de tipos ===================== */
 
-static void bind_push(VarBind **list, const char *name, IrType type) {
+static void bind_push(VarBind **list, const char *name, const char *ir_name,
+                      IrType type) {
     VarBind *b = xcalloc(1, sizeof *b);
     b->name = name;
+    b->ir_name = ir_name;
     b->type = type;
     b->next = *list;
     *list = b;
@@ -102,13 +119,92 @@ static void bind_free_all(VarBind *b) {
     }
 }
 
-static IrType lookup_var_type(GenCtx *ctx, const char *name) {
-    if (!name) return TYPE_UNKNOWN;
+static VarBind *lookup_var(GenCtx *ctx, const char *name) {
+    if (!name) return NULL;
     for (VarBind *b = ctx->locals; b; b = b->next)
-        if (strcmp(b->name, name) == 0) return b->type;
+        if (strcmp(b->name, name) == 0) return b;
     for (VarBind *b = ctx->globals; b; b = b->next)
-        if (strcmp(b->name, name) == 0) return b->type;
-    return TYPE_UNKNOWN;
+        if (strcmp(b->name, name) == 0) return b;
+    return NULL;
+}
+
+static IrType lookup_var_type(GenCtx *ctx, const char *name) {
+    VarBind *b = lookup_var(ctx, name);
+    return b ? b->type : TYPE_UNKNOWN;
+}
+
+/* Operando de variável já com o nome da IR. */
+static IrOperand var_op(GenCtx *ctx, const char *name, IrType type) {
+    VarBind *b = lookup_var(ctx, name);
+    return ir_var(b ? b->ir_name : name, type);
+}
+
+static const char *func_ir_name(GenCtx *ctx, const char *name) {
+    for (FuncName *fn = ctx->funcs; fn; fn = fn->next)
+        if (strcmp(fn->name, name) == 0) return fn->ir_name;
+    return name;
+}
+
+/* ===================== Nomes únicos ===================== */
+
+/* Palavras reservadas de C (C11) que são identificadores válidos em Java,
+ * e nomes usados pelo C gerado. */
+static int is_c_reserved(const char *s) {
+    static const char *words[] = {
+        "auto", "extern", "inline", "register", "restrict", "signed",
+        "sizeof", "struct", "typedef", "union", "unsigned", "volatile",
+        "_Bool", "_Complex", "_Imaginary", "_Alignas", "_Alignof",
+        "_Atomic", "_Generic", "_Noreturn", "_Static_assert",
+        "_Thread_local", "printf", NULL
+    };
+    for (int i = 0; words[i]; i++)
+        if (strcmp(s, words[i]) == 0) return 1;
+    return 0;
+}
+
+/* Nomes no formato dos temporários (t0, t12, ...) ficam para a IR. */
+static int looks_like_temp(const char *s) {
+    if (s[0] != 't' || !s[1]) return 0;
+    for (const char *p = s + 1; *p; p++)
+        if (*p < '0' || *p > '9') return 0;
+    return 1;
+}
+
+/* Um nome de variável está ocupado se colide com palavra reservada,
+ * temporário, função, global ou outra variável da função atual. */
+static int var_name_taken(GenCtx *ctx, const char *s) {
+    if (is_c_reserved(s) || looks_like_temp(s)) return 1;
+    for (FuncName *fn = ctx->funcs; fn; fn = fn->next)
+        if (strcmp(fn->ir_name, s) == 0) return 1;
+    for (IrGlobal *g = ctx->prog->globals; g; g = g->next)
+        if (strcmp(g->name, s) == 0) return 1;
+    if (ctx->func) {
+        for (IrParam *p = ctx->func->params; p; p = p->next)
+            if (strcmp(p->name, s) == 0) return 1;
+        for (IrLocal *l = ctx->func->locals; l; l = l->next)
+            if (strcmp(l->name, s) == 0) return 1;
+    }
+    return 0;
+}
+
+/* Nome livre a partir de 'base': base, base_1, base_2, ...
+ * Retorna string nova (o chamador libera). */
+static char *unique_name(GenCtx *ctx, const char *base,
+                         int (*taken)(GenCtx *, const char *)) {
+    if (!taken(ctx, base)) return xstrdup(base);
+    size_t len = strlen(base) + 16;
+    char *buf = xcalloc(len, 1);
+    for (int i = 1;; i++) {
+        snprintf(buf, len, "%s_%d", base, i);
+        if (!taken(ctx, buf)) return buf;
+    }
+}
+
+static int func_name_taken(GenCtx *ctx, const char *s) {
+    if (is_c_reserved(s) || looks_like_temp(s)) return 1;
+    for (FuncName *fn = ctx->funcs; fn; fn = fn->next)
+        if (strcmp(fn->ir_name, s) == 0) return 1;
+    return 0;
 }
 
 /* Converte DataType (tabela de símbolos) para Type (AST/IR). */
@@ -183,148 +279,23 @@ static IrType expr_type(GenCtx *ctx, Node *n) {
 
 /* ===================== Constantes ===================== */
 
-/* Valor de um literal de char a partir do texto cru (ex.: "a", "\n"). */
-static long char_literal_value(const char *text) {
-    if (!text || !text[0]) return 0;
-    if (text[0] != '\\' || text[1] == '\0') return (unsigned char)text[0];
-    switch (text[1]) {
-    case 'n':  return '\n';
-    case 't':  return '\t';
-    case 'r':  return '\r';
-    case 'b':  return '\b';
-    case 'f':  return '\f';
-    case '0':  return '\0';
-    case '\\': return '\\';
-    case '\'': return '\'';
-    case '"':  return '"';
-    default:   return (unsigned char)text[1];
-    }
+static IrOperand const_operand(ConstVal c) {
+    if (is_real(c.type)) return ir_const_real(c.d, c.type);
+    return ir_const_int(c.i, c.type);
 }
 
-static double const_as_real(IrOperand c) {
-    return is_real(c.type) ? c.value.d : (double)c.value.i;
-}
-
-/* Converte uma constante para o tipo 't', seguindo as regras de Java
- * (real -> inteiro trunca; int é 32 bits; char é 16 bits sem sinal). */
-static IrOperand const_convert(IrOperand c, IrType t) {
-    if (is_real(t)) {
-        double d = const_as_real(c);
-        if (t == TYPE_FLOAT) d = (float)d;
-        return ir_const_real(d, t);
-    }
-    if (t == TYPE_BOOLEAN || c.type == TYPE_BOOLEAN)
-        return ir_const_int(c.value.i ? 1 : 0, t);
-    long v = is_real(c.type) ? (long)c.value.d : c.value.i;
-    if (t == TYPE_CHAR) return ir_const_int((uint16_t)v, TYPE_CHAR);
-    return ir_const_int((int32_t)v, t == TYPE_UNKNOWN ? TYPE_INT : t);
-}
-
-/* Tenta avaliar 'n' em tempo de compilação. Retorna 1 e preenche *out
- * (operando IR_OP_CONST) se a expressão só envolve literais. */
+/* Avalia 'n' em tempo de compilação (ver const_eval.c). */
 static int fold_const(Node *n, IrOperand *out) {
-    if (!n) return 0;
-    switch (n->kind) {
-    case NODE_INT:
-        *out = ir_const_int(n->val.i, TYPE_INT);
-        return 1;
-    case NODE_FLOAT:
-        *out = ir_const_real(n->val.d,
-                             n->decl_type == TYPE_FLOAT ? TYPE_FLOAT : TYPE_DOUBLE);
-        return 1;
-    case NODE_CHAR:
-        *out = ir_const_int(char_literal_value(n->name), TYPE_CHAR);
-        return 1;
-    case NODE_BOOL:
-        *out = ir_const_int(n->val.i ? 1 : 0, TYPE_BOOLEAN);
-        return 1;
+    ConstVal c;
+    if (!const_eval(n, &c)) return 0;
+    *out = const_operand(c);
+    return 1;
+}
 
-    case NODE_CAST: {
-        IrOperand a;
-        if (!fold_const(n->a, &a)) return 0;
-        *out = const_convert(a, n->decl_type);
-        return 1;
-    }
-
-    case NODE_UNARY: {
-        IrOperand a;
-        if (!fold_const(n->a, &a)) return 0;
-        if (n->op == OP_NOT) {
-            *out = ir_const_int(!a.value.i, TYPE_BOOLEAN);
-        } else if (is_real(a.type)) {
-            *out = ir_const_real(-a.value.d, a.type);
-        } else {
-            *out = const_convert(ir_const_int(-a.value.i, TYPE_INT), TYPE_INT);
-        }
-        return 1;
-    }
-
-    case NODE_BINOP: {
-        IrOperand l, r;
-        if (!fold_const(n->a, &l) || !fold_const(n->b, &r)) return 0;
-        if (n->op == OP_AND || n->op == OP_OR) {
-            int v = (n->op == OP_AND) ? (l.value.i && r.value.i)
-                                      : (l.value.i || r.value.i);
-            *out = ir_const_int(v, TYPE_BOOLEAN);
-            return 1;
-        }
-        if (is_relational(n->op)) {
-            int v;
-            if (is_real(l.type) || is_real(r.type)) {
-                double a = const_as_real(l), b = const_as_real(r);
-                switch (n->op) {
-                case OP_LT: v = a <  b; break;
-                case OP_GT: v = a >  b; break;
-                case OP_LE: v = a <= b; break;
-                case OP_GE: v = a >= b; break;
-                case OP_EQ: v = a == b; break;
-                default:    v = a != b; break;
-                }
-            } else {
-                long a = l.value.i, b = r.value.i;
-                switch (n->op) {
-                case OP_LT: v = a <  b; break;
-                case OP_GT: v = a >  b; break;
-                case OP_LE: v = a <= b; break;
-                case OP_GE: v = a >= b; break;
-                case OP_EQ: v = a == b; break;
-                default:    v = a != b; break;
-                }
-            }
-            *out = ir_const_int(v, TYPE_BOOLEAN);
-            return 1;
-        }
-        IrType t = promote(l.type, r.type);
-        if (is_real(t)) {
-            double a = const_as_real(l), b = const_as_real(r), v;
-            switch (n->op) {
-            case OP_ADD:  v = a + b; break;
-            case OP_SUB:  v = a - b; break;
-            case OP_MULT: v = a * b; break;
-            case OP_DIV:  v = a / b; break;
-            default: return 0; /* % de reais: deixa para tempo de execução */
-            }
-            *out = const_convert(ir_const_real(v, TYPE_DOUBLE), t);
-            return 1;
-        }
-        /* inteiros: aritmética em 64 bits e depois reduz a 32 (estouro
-         * com wrap-around, como em Java). */
-        long a = (int32_t)l.value.i, b = (int32_t)r.value.i, v;
-        switch (n->op) {
-        case OP_ADD:  v = a + b; break;
-        case OP_SUB:  v = a - b; break;
-        case OP_MULT: v = a * b; break;
-        case OP_DIV:  if (b == 0) return 0; v = a / b; break;
-        case OP_MOD:  if (b == 0) return 0; v = a % b; break;
-        default: return 0;
-        }
-        *out = const_convert(ir_const_int(v, TYPE_INT), TYPE_INT);
-        return 1;
-    }
-
-    default:
-        return 0;
-    }
+/* Valor padrão de um tipo (campo static sem inicializador, seção 3.1). */
+static IrOperand default_value(IrType t) {
+    if (is_real(t)) return ir_const_real(0.0, t);
+    return ir_const_int(0, t);
 }
 
 /* ===================== Utilitários de emissão ===================== */
@@ -360,6 +331,7 @@ static void emit_assign(GenCtx *ctx, IrOperand dst, IrOperand src, IrType type) 
 /* ===================== Geração de expressões ===================== */
 
 static IrOperand gen_expr(GenCtx *ctx, Node *n);
+static IrOperand gen_expr_to(GenCtx *ctx, Node *n, IrType t);
 static void gen_stmt(GenCtx *ctx, Node *n);
 
 /* Gera IR para obter o endereço/valor de uma condição booleana como
@@ -451,9 +423,13 @@ static IrOperand gen_call(GenCtx *ctx, Node *n) {
     for (Node *arg = n->a; arg; arg = arg->next) nargs++;
 
     IrOperand *vals = nargs ? xcalloc((size_t)nargs, sizeof *vals) : NULL;
+    Symbol *fs = st_lookup_global(n->name);
     int i = 0;
     for (Node *arg = n->a; arg; arg = arg->next, i++) {
-        vals[i] = gen_expr(ctx, arg);
+        IrType pt = TYPE_UNKNOWN;
+        if (fs && fs->kind == SYM_FUNCTION && i < fs->param_count)
+            pt = type_from_dt(fs->param_types[i]);
+        vals[i] = gen_expr_to(ctx, arg, pt);
         /* Java avalia da esquerda para a direita: se um argumento
          * posterior faz uma chamada (que pode alterar uma global), o
          * valor de uma variável já avaliada é copiado antes. */
@@ -480,10 +456,33 @@ static IrOperand gen_call(GenCtx *ctx, Node *n) {
     IrInstr *c = ir_emit(ctx->func, IR_CALL);
     c->type = rt;
     c->res = dst;
-    c->arg1 = ir_func_ref(n->name);
+    c->arg1 = ir_func_ref(func_ir_name(ctx, n->name));
     c->arg2 = ir_const_int(nargs, TYPE_INT);
     if (dst.kind == IR_OP_TEMP) return ir_temp(dst.id, dst.type);
     return dst; /* vazio se void; chamador como stmt ignora */
+}
+
+/* Constante usada num destino de tipo 't' (atribuição, parâmetro,
+ * return): já sai convertida, para a IR não ter conversão implícita de
+ * constantes (ex.: 'double d = 2' vira 'd = 2.0'). */
+static IrOperand coerce_const(IrOperand op, IrType t) {
+    if (op.kind != IR_OP_CONST || op.type == t || t == TYPE_UNKNOWN ||
+        t == TYPE_VOID || t == TYPE_BOOLEAN || op.type == TYPE_BOOLEAN)
+        return op;
+    ConstVal c = { op.type, op.value.i, op.value.d };
+    return const_operand(const_convert(c, t));
+}
+
+/* Gera uma expressão cujo valor vai para um destino do tipo 't'. A única
+ * conversão de estreitamento implícita do Java (constante int que cabe
+ * em char, ex.: char c = 'a' + 1) é resolvida aqui, em tempo de
+ * compilação; as demais conversões implícitas são alargamentos. */
+static IrOperand gen_expr_to(GenCtx *ctx, Node *n, IrType t) {
+    if (t == TYPE_CHAR && expr_type(ctx, n) == TYPE_INT) {
+        ConstVal c;
+        if (const_eval(n, &c)) return const_operand(const_convert(c, TYPE_CHAR));
+    }
+    return coerce_const(gen_expr(ctx, n), t);
 }
 
 static IrOperand gen_expr(GenCtx *ctx, Node *n) {
@@ -501,7 +500,7 @@ static IrOperand gen_expr(GenCtx *ctx, Node *n) {
 
     case NODE_IDENTIFIER:
         /* Variável/local/global/parâmetro: em TAC referenciamos pelo nome. */
-        return ir_var(n->name, expr_type(ctx, n));
+        return var_op(ctx, n->name, expr_type(ctx, n));
 
     case NODE_UNARY: {
         IrOperand val = gen_expr(ctx, n->a);
@@ -586,10 +585,11 @@ static void gen_assign_stmt(GenCtx *ctx, Node *n) {
     /* n->name = variável alvo, n->op = tipo de atribuição, n->a = expr */
     IrType vt = lookup_var_type(ctx, n->name);
     if (vt == TYPE_UNKNOWN) vt = expr_type(ctx, n->a);
-    IrOperand rhs = gen_expr(ctx, n->a);
+    IrOperand rhs = (n->op == OP_ASSIGN) ? gen_expr_to(ctx, n->a, vt)
+                                         : gen_expr(ctx, n->a);
 
     if (n->op == OP_ASSIGN) {
-        emit_assign(ctx, ir_var(n->name, vt), rhs, vt);
+        emit_assign(ctx, var_op(ctx, n->name, vt), rhs, vt);
         return;
     }
 
@@ -610,7 +610,7 @@ static void gen_assign_stmt(GenCtx *ctx, Node *n) {
     bin->type = bt;
     bin->binop = bop;
     bin->res = tmp;
-    bin->arg1 = ir_var(n->name, vt);
+    bin->arg1 = var_op(ctx, n->name, vt);
     bin->arg2 = rhs;
 
     IrOperand result = ir_temp(tmp.id, bt);
@@ -623,7 +623,7 @@ static void gen_assign_stmt(GenCtx *ctx, Node *n) {
         ci->arg1 = result;
         result = ir_temp(cast.id, vt);
     }
-    emit_assign(ctx, ir_var(n->name, vt), result, vt);
+    emit_assign(ctx, var_op(ctx, n->name, vt), result, vt);
 }
 
 /* ++/-- (pré/pós) como statement: x = x +/- 1, no tipo da variável. Para
@@ -638,7 +638,7 @@ static void gen_incdec_stmt(GenCtx *ctx, Node *n) {
     bin->type = bt;
     bin->binop = (n->op == OP_PREINC || n->op == OP_POSTINC) ? OP_ADD : OP_SUB;
     bin->res = tmp;
-    bin->arg1 = ir_var(n->name, vt);
+    bin->arg1 = var_op(ctx, n->name, vt);
     bin->arg2 = ir_const_int(1, TYPE_INT);
 
     IrOperand result = ir_temp(tmp.id, bt);
@@ -651,7 +651,7 @@ static void gen_incdec_stmt(GenCtx *ctx, Node *n) {
         ci->arg1 = result;
         result = ir_temp(cast.id, vt);
     }
-    emit_assign(ctx, ir_var(n->name, vt), result, vt);
+    emit_assign(ctx, var_op(ctx, n->name, vt), result, vt);
 }
 
 static void gen_if(GenCtx *ctx, Node *n) {
@@ -777,16 +777,20 @@ static void gen_stmt(GenCtx *ctx, Node *n) {
         gen_block_stmts(ctx, n);
         break;
 
-    case NODE_VARDECL:
-        /* Declaração local: registra o tipo e, se há init, gera atribuição.
-         * (A "alocação" em si é conceitual; na geração de C vira declaração.)
-         * O init é gerado antes de registrar o nome, como em Java. */
-        if (n->a) {
-            IrOperand rhs = gen_expr(ctx, n->a);
-            emit_assign(ctx, ir_var(n->name, n->decl_type), rhs, n->decl_type);
-        }
-        bind_push(&ctx->locals, n->name, n->decl_type);
+    case NODE_VARDECL: {
+        /* Declaração local: entra na lista de locais da função com um
+         * nome único e, se há init, gera atribuição. O init é gerado
+         * antes de registrar o nome, como em Java. */
+        IrOperand rhs = n->a ? gen_expr_to(ctx, n->a, n->decl_type) : ir_empty();
+        char *irn = unique_name(ctx, n->name, var_name_taken);
+        ir_func_add_local(ctx->func, irn, n->decl_type);
+        free(irn);
+        IrLocal *l = ctx->func->locals;
+        while (l->next) l = l->next;
+        bind_push(&ctx->locals, n->name, l->name, n->decl_type);
+        if (n->a) emit_assign(ctx, ir_var(l->name, n->decl_type), rhs, n->decl_type);
         break;
+    }
 
     case NODE_ASSIGN:
         gen_assign_stmt(ctx, n);
@@ -844,7 +848,7 @@ static void gen_stmt(GenCtx *ctx, Node *n) {
     case NODE_RETURN: {
         /* Igual ao print: calcula a expressão primeiro e só depois emite
          * o return, para não inverter a ordem das instruções. */
-        IrOperand value = n->a ? gen_expr(ctx, n->a) : ir_empty();
+        IrOperand value = n->a ? gen_expr_to(ctx, n->a, ctx->func->ret_type) : ir_empty();
         IrInstr *r = ir_emit(ctx->func, IR_RETURN);
         r->arg1 = value;
         break;
@@ -864,31 +868,55 @@ static void gen_stmt(GenCtx *ctx, Node *n) {
 
 /* ===================== Estrutura do programa ===================== */
 
-/* Registra os campos static. Inicializadores avaliáveis em tempo de
- * compilação (literais, -1, 2 + 3, (double) 1, ...) viram o valor inicial
- * do global, já convertido para o tipo declarado; os demais ficam
- * pendentes e são emitidos como código no início do main. */
+/* Registra os nomes das funções (antes de tudo: variáveis não podem
+ * colidir com eles na IR). */
+static void collect_funcs(GenCtx *ctx, Node *member) {
+    FuncName **tail = &ctx->funcs;
+    for (Node *m = member; m; m = m->next) {
+        if (m->kind != NODE_METHOD || !m->name) continue;
+        FuncName *fn = xcalloc(1, sizeof *fn);
+        fn->name = m->name;
+        fn->ir_name = unique_name(ctx, m->name, func_name_taken);
+        *tail = fn;
+        tail = &fn->next;
+    }
+}
+
+/* Registra os campos static. Todo global recebe valor inicial na IR:
+ *  - inicializador constante (literais, -1, 2 + 3, (double) 1, ...):
+ *    o valor, já convertido para o tipo declarado;
+ *  - sem inicializador: o valor padrão do tipo (especificação, 3.1);
+ *  - inicializador não constante: o valor padrão, e a atribuição vira
+ *    código no início do main. A partir do primeiro desses, os globais
+ *    seguintes também são atribuídos em código, na ordem do fonte, como
+ *    no Java (um inicializador pode chamar função que lê um global
+ *    declarado depois, que ainda deve valer o padrão nesse momento). */
 static void collect_globals(GenCtx *ctx, Node *member) {
     PendingInit **tail = &ctx->pending;
+    int in_order = 0;
     for (Node *m = member; m; m = m->next) {
         if (m->kind != NODE_VARDECL || !m->is_global) continue;
 
-        int has_init = 0;
-        IrOperand init = ir_empty();
+        IrOperand init = default_value(m->decl_type);
         if (m->a) {
             IrOperand c;
-            if (fold_const(m->a, &c)) {
-                init = const_convert(c, m->decl_type);
-                has_init = 1;
+            if (!in_order && fold_const(m->a, &c)) {
+                ConstVal cv = { c.type, c.value.i, c.value.d };
+                init = const_operand(const_convert(cv, m->decl_type));
             } else {
+                in_order = 1;
                 PendingInit *pi = xcalloc(1, sizeof *pi);
                 pi->decl = m;
                 *tail = pi;
                 tail = &pi->next;
             }
         }
-        ir_program_add_global(ctx->prog, m->name, m->decl_type, has_init, init);
-        bind_push(&ctx->globals, m->name, m->decl_type);
+        char *irn = unique_name(ctx, m->name, var_name_taken);
+        ir_program_add_global(ctx->prog, irn, m->decl_type, 1, init);
+        free(irn);
+        IrGlobal *g = ctx->prog->globals;
+        while (g->next) g = g->next;
+        bind_push(&ctx->globals, m->name, g->name, m->decl_type);
     }
 }
 
@@ -898,8 +926,8 @@ static void emit_pending_inits(GenCtx *ctx) {
     ctx->inits_done = 1;
     for (PendingInit *pi = ctx->pending; pi; pi = pi->next) {
         Node *m = pi->decl;
-        IrOperand rhs = gen_expr(ctx, m->a);
-        emit_assign(ctx, ir_var(m->name, m->decl_type), rhs, m->decl_type);
+        IrOperand rhs = gen_expr_to(ctx, m->a, m->decl_type);
+        emit_assign(ctx, var_op(ctx, m->name, m->decl_type), rhs, m->decl_type);
     }
 }
 
@@ -918,7 +946,8 @@ static int is_main_name(const char *name) {
 }
 
 static void gen_function(GenCtx *ctx, Node *method) {
-    IrFunc *f = ir_program_add_func(ctx->prog, method->name ? method->name : "anon",
+    IrFunc *f = ir_program_add_func(ctx->prog,
+                                    method->name ? func_ir_name(ctx, method->name) : "anon",
                                     method->decl_type);
     IrFunc *prev_func = ctx->func;
     VarBind *mark = ctx->locals;
@@ -927,8 +956,12 @@ static void gen_function(GenCtx *ctx, Node *method) {
     /* parâmetros */
     for (Node *p = method->a; p; p = p->next) {
         if (p->kind == NODE_PARAM) {
-            ir_func_add_param(f, p->name, p->decl_type);
-            bind_push(&ctx->locals, p->name, p->decl_type);
+            char *irn = unique_name(ctx, p->name, var_name_taken);
+            ir_func_add_param(f, irn, p->decl_type);
+            free(irn);
+            IrParam *ip = f->params;
+            while (ip->next) ip = ip->next;
+            bind_push(&ctx->locals, p->name, ip->name, p->decl_type);
         }
     }
 
@@ -970,7 +1003,8 @@ IrProgram *ir_generate(Node *root) {
         return prog;
     }
 
-    /* 1) Coleta globais (campos static). */
+    /* 1) Coleta nomes de funções e globais (campos static). */
+    collect_funcs(&ctx, classNode->a);
     collect_globals(&ctx, classNode->a);
 
     /* 2) Gera métodos e bloco solto (se houver). */
@@ -993,6 +1027,12 @@ IrProgram *ir_generate(Node *root) {
 
     free_pending(&ctx);
     bind_free_all(ctx.globals);
+    for (FuncName *fn = ctx.funcs; fn;) {
+        FuncName *next = fn->next;
+        free(fn->ir_name);
+        free(fn);
+        fn = next;
+    }
     locals_restore(&ctx, NULL);
     return prog;
 }

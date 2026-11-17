@@ -63,8 +63,18 @@ static void ir_free_instr(IrInstr *ins) {
     free(ins);
 }
 
+static void ir_free_locals(IrLocal *l) {
+    while (l) {
+        IrLocal *next = l->next;
+        free(l->name);
+        free(l);
+        l = next;
+    }
+}
+
 static void ir_free_func(IrFunc *f) {
     ir_free_params(f->params);
+    ir_free_locals(f->locals);
     IrInstr *ins = f->first;
     while (ins) {
         IrInstr *next = ins->next;
@@ -125,6 +135,15 @@ void ir_func_add_param(IrFunc *f, const char *name, IrType type) {
         while (it->next) it = it->next;
         it->next = pr;
     }
+}
+
+void ir_func_add_local(IrFunc *f, const char *name, IrType type) {
+    IrLocal *l = ir_calloc(1, sizeof *l);
+    l->name = ir_strdup(name);
+    l->type = type;
+    IrLocal **tail = &f->locals;
+    while (*tail) tail = &(*tail)->next;
+    *tail = l;
 }
 
 void ir_program_add_global(IrProgram *p, const char *name, IrType type,
@@ -446,6 +465,12 @@ void ir_print_program(FILE *out, const IrProgram *p) {
             if (pr->next) fputs(", ", out);
         }
         fprintf(out, ") -> %s\n", ir_type_name(f->ret_type));
+        if (f->locals) {
+            fputs("    locals: ", out);
+            for (IrLocal *l = f->locals; l; l = l->next)
+                fprintf(out, "%s: %s%s", l->name, ir_type_name(l->type),
+                        l->next ? ", " : "\n");
+        }
         ir_print_temps(out, f);
         for (IrInstr *ins = f->first; ins; ins = ins->next) {
             ir_print_instr(out, ins);
