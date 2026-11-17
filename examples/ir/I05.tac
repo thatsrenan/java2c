@@ -1,10 +1,11 @@
 === IR (TAC) ===
 func main() -> void
+    locals: d: double, i: int, c: char, f: float, r: double
     temps: t0: double, t1: double, t2: double, t3: int, t4: int, t5: int, t6: char, t7: float, t8: double, t9: double
     d = 1.5
     t0 = d + 1
     d = t0
-    d = 2
+    d = 2.0
     t1 = d + 1
     d = t1
     i = 10

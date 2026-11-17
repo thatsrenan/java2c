@@ -8,7 +8,7 @@ global inteiro: double = 2.0
 global quebra: char = 10
 global tab: char = 9
 global flag: boolean = true
-global depende: int
+global depende: int = 0
 
 func main() -> void
     temps: t0: int

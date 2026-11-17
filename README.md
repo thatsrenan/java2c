@@ -24,8 +24,11 @@ verificações de escopo/declaração.
 ├── src
 │   ├── main.c
 │   ├── lextest.c
-│   ├── symbol_table.c
-│   └── symbol_table.h
+│   ├── symbol_table.{c,h}
+│   ├── semantic_flow.{c,h}   # retorno, alcançabilidade, inicialização
+│   ├── const_eval.{c,h}      # expressões constantes
+│   ├── ir.{c,h}              # estruturas e impressão da TAC
+│   └── ir_gen.{c,h}          # AST -> TAC
 ├── tests
 │   ├── check.sh
 │   └── check_escopo.sh
@@ -66,6 +69,12 @@ Para imprimir a tabela de símbolos ao final da análise:
 ./protoparser --tabela examples/escopo/E09.java
 ```
 
+Para imprimir a representação intermediária (código de três endereços):
+
+```bash
+./protoparser --ir examples/ir/I03.java
+```
+
 O código de saída é `0` apenas quando não há erro léxico, sintático ou
 semântico.
 
@@ -96,13 +105,35 @@ As verificações realizadas incluem:
 - tipos incompatíveis em atribuições, inicializações, retornos e operadores;
 - condições de `if`, `while`, `for` e `do while` devem ser `boolean`;
 - `break`/`continue` somente dentro de laços;
-- `return` compatível com o tipo de retorno do método.
+- `return` compatível com o tipo de retorno do método;
+- constante `int` que cabe em `char` pode ser atribuída a `char`
+  (`char c = 65;`), como em Java; em argumentos de chamada, não.
+
+Depois do parser, uma análise de fluxo sobre a AST (`src/semantic_flow.c`,
+regras do Java) verifica ainda:
+
+- método não-`void` retorna um valor em todos os caminhos;
+- código inalcançável (depois de `return`/`break`/`continue`, corpo de
+  `while (false)`) é erro;
+- variável local precisa estar inicializada antes de ser lida, considerando
+  todos os caminhos (`if (true) { x = 5; }` conta como atribuição, como no
+  javac).
 
 Erros semânticos são reportados no formato:
 
 ```text
 ERRO SEMANTICO na linha N: <descrição>
 ```
+
+## Representação Intermediária
+
+`./protoparser --ir` gera código de três endereços (TAC) a partir da AST
+validada. Cada função lista parâmetros, locais (`locals:`) e temporários
+(`temps:`) com tipo; toda global tem valor inicial (o padrão do tipo, se o
+Java não der um). Nomes de variáveis são únicos dentro de cada função:
+locais de blocos diferentes com o mesmo nome, ou que ocultam uma global,
+são renomeadas (`y`, `y_1`), assim como nomes que colidem com palavras
+reservadas de C ou com temporários (`tN`).
 
 ## Testes
 

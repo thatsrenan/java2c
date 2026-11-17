@@ -12,6 +12,7 @@ func incrementar() -> void
     contador = t0
 
 func main() -> void
+    locals: resultado: int
     temps: t0: int
     param 10
     param 20

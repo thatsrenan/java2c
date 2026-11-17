@@ -1,6 +1,6 @@
 === IR (TAC) ===
 global base: int = 7
-global dobro: int
+global dobro: int = 0
 
 func get() -> int
     return dobro

@@ -18,6 +18,7 @@ func muda() -> int
     return g
 
 func main() -> void
+    locals: r: int, s: int, t: int
     temps: t0: int, t1: int, t2: int, t3: int, t4: int, t5: int, t6: int, t7: int, t8: int, t9: int, t10: int
     param 2
     t0 = call k, 1

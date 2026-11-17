@@ -1,5 +1,6 @@
 === IR (TAC) ===
 func main() -> void
+    locals: i: int, j: int
     temps: t0: boolean, t1: int, t2: boolean, t3: int, t4: boolean, t5: int, t6: boolean, t7: int, t8: int, t9: boolean
     i = 0
 Lwhile_cond0:
