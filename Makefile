@@ -40,16 +40,19 @@ $(BUILD_DIR)/parser.tab.c $(BUILD_DIR)/parser.tab.h: $(PARSER_DIR)/parser.y | $(
 $(BUILD_DIR)/lex.yy.c: $(LEXER_DIR)/lexer.l $(BUILD_DIR)/parser.tab.h
 	flex -o $(BUILD_DIR)/lex.yy.c $(LEXER_DIR)/lexer.l
 
-PARSER_SRCS = $(SRC_DIR)/main.c $(SRC_DIR)/symbol_table.c $(BUILD_DIR)/parser.tab.c $(BUILD_DIR)/lex.yy.c \
-              $(PARSER_DIR)/ast.c
+PARSER_SRCS = $(SRC_DIR)/main.c $(SRC_DIR)/symbol_table.c $(SRC_DIR)/ir.c $(SRC_DIR)/ir_gen.c \
+              $(SRC_DIR)/const_eval.c $(SRC_DIR)/semantic_flow.c \
+              $(BUILD_DIR)/parser.tab.c $(BUILD_DIR)/lex.yy.c $(PARSER_DIR)/ast.c
 
-protoparser: $(PARSER_SRCS) $(PARSER_DIR)/ast.h $(SRC_DIR)/symbol_table.h
+IR_HDRS = $(SRC_DIR)/ir.h $(SRC_DIR)/ir_gen.h $(SRC_DIR)/const_eval.h $(SRC_DIR)/semantic_flow.h
+
+protoparser: $(PARSER_SRCS) $(PARSER_DIR)/ast.h $(SRC_DIR)/symbol_table.h $(IR_HDRS)
 	$(CC) $(CFLAGS) -o protoparser $(PARSER_SRCS)
 
 # Mesmo protoparser, compilado com os sanitizers: usado por test-ast-parser
 # para pegar vazamento ou acesso inválido na montagem/liberação da AST,
 # inclusive quando a análise para no meio por erro de sintaxe.
-protoparser-san: $(PARSER_SRCS) $(PARSER_DIR)/ast.h $(SRC_DIR)/symbol_table.h
+protoparser-san: $(PARSER_SRCS) $(PARSER_DIR)/ast.h $(SRC_DIR)/symbol_table.h $(IR_HDRS)
 	$(CC) $(CFLAGS) -g $(SANITIZE) -o protoparser-san $(PARSER_SRCS)
 
 # Testa só o lexer: não linka o parser, então funciona mesmo que a
@@ -123,8 +126,12 @@ test-mem: protoparser-san
 test-escopo-check: protoparser
 	@bash tests/check_escopo.sh ./protoparser examples/escopo
 
+# Confere a IR (TAC) gerada por "protoparser --ir" contra examples/ir/*.tac.
+test-ir-check: protoparser
+	@bash tests/check_ir.sh ./protoparser examples/ir
+
 # Todas as conferências automáticas que já devem passar.
-check: test-check test-ast test-sintaxe test-ast-parser test-mem test-escopo-check
+check: test-check test-ast test-sintaxe test-ast-parser test-mem test-escopo-check test-ir-check
 
 test-escopo: protoparser
 	@for f in examples/escopo/*.java; do \
@@ -152,4 +159,4 @@ test-all-save: protoparser lextest asttest
 clean:
 	rm -rf protoparser protoparser-san lextest asttest $(BUILD_DIR)
 
-.PHONY: all test test-tokens test-lexico test-check test-ast test-sintaxe test-ast-parser test-mem test-escopo-check check test-escopo test-all-save clean
+.PHONY: all test test-tokens test-lexico test-check test-ast test-sintaxe test-ast-parser test-mem test-escopo-check test-ir-check check test-escopo test-all-save clean

@@ -37,9 +37,9 @@ E09  ok                                   # local pode ocultar a global 'contado
 E10  ok                                   # global sem inicializador, atribuida na funcao
 
 # ---------- declaracao e uso ----------
-E11  ok                                   # uso de variável declarada mas sem valor atribuído
+E11  erro : ERRO SEMANTICO                # x lido sem valor atribuido (spec 3: definite assignment)
 E12  ok                                   # declarada, inicializada e usada
-E13                                       # verificar
+E13  ok                                   # x atribuido dentro de if (true): conta como atribuido (como no javac)
 E14  erro: ERRO SEMANTICO                 # Java aceita sobrecarga de soma, mas C não
 E15  ok                                   # duas funcoes com nomes diferentes
 E16  ok                                   # main chama funcao declarada antes
@@ -50,11 +50,33 @@ E18  erro : ERRO SEMANTICO                # 'i' do for usado depois do for
 E19  ok                                   # variavel declarada dentro do corpo do for
 E20  erro : ERRO SEMANTICO                # 'i' do for oculta o 'i' local ja visivel
 
+# ---------- fluxo: retorno, alcancabilidade e inicializacao (src/semantic_flow.c) ----------
+F01  erro : ERRO SEMANTICO                # metodo int sem return quando n <= 0 (spec 8)
+F02  ok                                   # if/else retornam nos dois ramos
+F03  ok                                   # while (true) sem break nunca termina: nao precisa de return
+F04  erro : ERRO SEMANTICO                # while (true) com break termina: falta return
+F05  erro : ERRO SEMANTICO                # comando depois de return e inalcancavel
+F06  erro : ERRO SEMANTICO                # comando depois de break e inalcancavel
+F07  erro : ERRO SEMANTICO                # corpo de while (false) e inalcancavel
+F08  ok                                   # if (false) e permitido (compilacao condicional)
+F09  erro : ERRO SEMANTICO                # x atribuido so em um ramo do if
+F10  ok                                   # x atribuido nos dois ramos
+F11  erro : ERRO SEMANTICO                # x atribuido so dentro do while (pode nao executar)
+F12  ok                                   # for (;;) so sai por return
+F13  erro : ERRO SEMANTICO                # x += 1 le x sem valor
+F14  ok                                   # false && x > 0: x nunca e lido (como no javac)
+F15  ok                                   # constante int que cabe em char (65, 'a' + 1)
+F16  erro : ERRO SEMANTICO                # 70000 nao cabe em char
+F17  erro : ERRO SEMANTICO                # int nao constante para char exige cast
+F18  erro : ERRO SEMANTICO                # argumento nao tem conversao de constante (int -> char)
+F19  ok                                   # do-while cujo corpo sempre retorna
+F20  erro : ERRO SEMANTICO                # comando depois de continue e inalcancavel
+F21  ok                                   # break do laco interno nao encerra o externo
+F22  ok                                   # x atribuido antes do unico break de while (true)
+F23  ok                                   # return 65 em metodo char (constante cabe)
+F24  erro : ERRO SEMANTICO                # for com condicao pode nao executar: falta return
+
 # ---------- PENDENTES: dependem da especificacao ----------
-# E11: 'int x;' seguido de uso. Java rejeita (variavel possivelmente nao
-#      inicializada). Se a spec nao exige essa analise, o caso e 'ok'.
-# E13: atribuicao dentro de 'if (true)'. O javac ACEITA (true e constante, entao x
-#      conta como atribuida), mas uma analise simplificada rejeitaria.
 # E14: sobrecarga de soma(int,int) e soma(double,double). Valido em Java; se a
 #      spec proibe funcoes com o mesmo nome (C nao tem sobrecarga), e erro.
 # E17: main chama dobro, declarada DEPOIS. Valido em Java; se a spec exige

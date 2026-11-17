@@ -51,6 +51,7 @@
  * parser.tab.c e as funcoes abaixo ja usam Type/Node/OpKind. */
 #include "ast.h"
 #include "symbol_table.h"
+#include "const_eval.h"
 
 int yylex(void);
 void yyerror(const char *s);
@@ -203,11 +204,25 @@ static DataType dt_of(Node *n) {
     }
 }
 
-static void check_assignment_op(Symbol *var, OpKind op, DataType rhs) {
+/* Contexto de atribuição (JLS 5.2): além do alargamento, uma expressão
+ * CONSTANTE int pode ir para char se o valor couber (ex.: char c = 65;
+ * char d = 'a' + 1;). Não vale para argumentos de chamada (JLS 5.3). */
+static int is_assignable_expr(DataType dst, Node *e) {
+    DataType src = dt_of(e);
+    if (is_assignable(dst, src)) return 1;
+    if (dst == ST_TYPE_CHAR && src == ST_TYPE_INT) {
+        ConstVal c;
+        if (const_eval(e, &c) && c.i >= 0 && c.i <= 65535) return 1;
+    }
+    return 0;
+}
+
+static void check_assignment_op(Symbol *var, OpKind op, Node *rhs_expr) {
     if (!var) return;
+    DataType rhs = dt_of(rhs_expr);
     const char *opstr = op_name(op);
     if (op == OP_ASSIGN) {
-        if (!is_assignable(var->type, rhs)) {
+        if (!is_assignable_expr(var->type, rhs_expr)) {
             semantic_error("tipos incompativeis: nao e possivel atribuir %s a '%s' (%s)",
                            st_type_name(rhs), var->name, st_type_name(var->type));
         }
@@ -542,7 +557,7 @@ field_decl:
             Symbol *sym = declare_global($3, dt_from_type($2), @3.first_line, 1);
             if (sym) {
                 DataType rhs = dt_of($5);
-                if (!is_assignable(sym->type, rhs)) {
+                if (!is_assignable_expr(sym->type, $5)) {
                     semantic_error("tipos incompativeis no inicializador de '%s' (%s <- %s)",
                                    sym->name, st_type_name(sym->type), st_type_name(rhs));
                 }
@@ -694,7 +709,7 @@ vardecl:
             Symbol *sym = declare_variable($2, dt_from_type($1), @2.first_line, 1);
             if (sym) {
                 DataType rhs = dt_of($4);
-                if (!is_assignable(sym->type, rhs)) {
+                if (!is_assignable_expr(sym->type, $4)) {
                     semantic_error("tipos incompativeis no inicializador de '%s' (%s <- %s)",
                                    sym->name, st_type_name(sym->type), st_type_name(rhs));
                 }
@@ -715,7 +730,7 @@ assign_stmt:
         IDENTIFIER assign_op expr SEMICOLON
         {
             Symbol *sym = lookup_variable($1);
-            check_assignment_op(sym, $2, dt_of($3));
+            check_assignment_op(sym, $2, $3);
             $$ = new_assign($2, $1, $3, @1.first_line);
         }
     ;
@@ -874,7 +889,7 @@ for_init:
             Symbol *sym = declare_variable($2, dt_from_type($1), @2.first_line, 1);
             if (sym) {
                 DataType rhs = dt_of($4);
-                if (!is_assignable(sym->type, rhs)) {
+                if (!is_assignable_expr(sym->type, $4)) {
                     semantic_error("tipos incompativeis no inicializador de '%s' (%s <- %s)",
                                    sym->name, st_type_name(sym->type), st_type_name(rhs));
                 }
@@ -884,7 +899,7 @@ for_init:
     |   IDENTIFIER assign_op expr
         {
             Symbol *sym = lookup_variable($1);
-            check_assignment_op(sym, $2, dt_of($3));
+            check_assignment_op(sym, $2, $3);
             $$ = new_assign($2, $1, $3, @1.first_line);
         }
     ;
@@ -903,7 +918,7 @@ for_update:
     |   IDENTIFIER assign_op expr
         {
             Symbol *sym = lookup_variable($1);
-            check_assignment_op(sym, $2, dt_of($3));
+            check_assignment_op(sym, $2, $3);
             $$ = new_assign($2, $1, $3, @1.first_line);
         }
     |   IDENTIFIER INCREMENT
@@ -976,7 +991,7 @@ return_stmt:
             DataType t = dt_of($2);
             if (current_return_type == ST_TYPE_VOID) {
                 semantic_error("metodo void nao pode retornar valor");
-            } else if (!is_assignable(current_return_type, t)) {
+            } else if (!is_assignable_expr(current_return_type, $2)) {
                 semantic_error("tipo de retorno incompativel (%s esperado, %s encontrado)",
                                st_type_name(current_return_type), st_type_name(t));
             }

@@ -7,6 +7,9 @@
 # Os casos invalidos importam: neles o parser para no meio e quem libera as
 # subarvores ja montadas sao os %destructor do parser.y.
 #
+# Cada arquivo roda duas vezes: no modo padrao e com --ir, para cobrir
+# tambem a montagem/liberacao da representacao intermediaria (TAC).
+#
 # Uso:  bash tests/check_mem.sh [caminho-do-protoparser-san] [diretorio...]
 #       (padrao: ./protoparser-san  examples/*/ e examples/*.java)
 #
@@ -37,20 +40,23 @@ trap 'rm -f "$errf"' EXIT
 total=0
 failed=()
 
-echo "${B}Conferindo memoria da AST (sanitizers) em: ${DIRS[*]}${Z}"
+echo "${B}Conferindo memoria da AST e da IR (sanitizers) em: ${DIRS[*]}${Z}"
 echo
 
 for d in "${DIRS[@]}"; do
     for f in "${d%/}"/*.java; do
         [ -e "$f" ] || continue
         total=$((total + 1))
-        "$PARSER" "$f" > /dev/null 2> "$errf"
-        rc=$?
-        if [ "$rc" -gt 1 ] || grep -qE 'Sanitizer|runtime error' "$errf"; then
-            failed+=("$f")
-            printf "  %s[FALHA]%s %s (exit code %s)\n" "$R" "$Z" "$f" "$rc"
-            grep -m3 -E 'ERROR|SUMMARY|runtime error' "$errf" | sed 's/^/           /'
-        fi
+        for mode in "" "--ir"; do
+            "$PARSER" $mode "$f" > /dev/null 2> "$errf"
+            rc=$?
+            if [ "$rc" -gt 1 ] || grep -qE 'Sanitizer|runtime error' "$errf"; then
+                failed+=("$f${mode:+ ($mode)}")
+                printf "  %s[FALHA]%s %s %s(exit code %s)\n" "$R" "$Z" "$f" "${mode:+$mode }" "$rc"
+                grep -m3 -E 'ERROR|SUMMARY|runtime error' "$errf" | sed 's/^/           /'
+                break
+            fi
+        done
     done
 done
 
