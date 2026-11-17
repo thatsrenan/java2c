@@ -109,6 +109,7 @@ ERRO SEMANTICO na linha N: <descrição>
 ```bash
 make test-check          # lexer contra examples/lexico/esperado.txt
 make test-escopo-check   # parser + tabela de símbolos contra examples/escopo/esperado.txt
+make test-ir-check       # IR (TAC) contra examples/ir/*.tac
 make test-lexico         # mostra entrada/saída de cada caso léxico
 make test-escopo         # mostra entrada/saída de cada caso de escopo
 ```

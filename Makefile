@@ -125,8 +125,12 @@ test-mem: protoparser-san
 test-escopo-check: protoparser
 	@bash tests/check_escopo.sh ./protoparser examples/escopo
 
+# Confere a IR (TAC) gerada por "protoparser --ir" contra examples/ir/*.tac.
+test-ir-check: protoparser
+	@bash tests/check_ir.sh ./protoparser examples/ir
+
 # Todas as conferências automáticas que já devem passar.
-check: test-check test-ast test-sintaxe test-ast-parser test-mem test-escopo-check
+check: test-check test-ast test-sintaxe test-ast-parser test-mem test-escopo-check test-ir-check
 
 test-escopo: protoparser
 	@for f in examples/escopo/*.java; do \
@@ -154,4 +158,4 @@ test-all-save: protoparser lextest asttest
 clean:
 	rm -rf protoparser protoparser-san lextest asttest $(BUILD_DIR)
 
-.PHONY: all test test-tokens test-lexico test-check test-ast test-sintaxe test-ast-parser test-mem test-escopo-check check test-escopo test-all-save clean
+.PHONY: all test test-tokens test-lexico test-check test-ast test-sintaxe test-ast-parser test-mem test-escopo-check test-ir-check check test-escopo test-all-save clean
