@@ -4,6 +4,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "symbol_table.h"
+
 /*
  * ir_gen.c
  *
@@ -76,6 +78,30 @@ static IrType expr_ir_type(Node *n) {
     IrType t = node_type(n);
     if (t == TYPE_UNKNOWN) return TYPE_INT; /* fallback conservador */
     return t;
+}
+
+/* Converte DataType (tabela de símbolos) para Type (AST/IR). */
+static IrType type_from_dt(DataType dt) {
+    switch (dt) {
+    case ST_TYPE_INT:     return TYPE_INT;
+    case ST_TYPE_FLOAT:   return TYPE_FLOAT;
+    case ST_TYPE_DOUBLE:  return TYPE_DOUBLE;
+    case ST_TYPE_BOOLEAN: return TYPE_BOOLEAN;
+    case ST_TYPE_CHAR:    return TYPE_CHAR;
+    case ST_TYPE_VOID:    return TYPE_VOID;
+    case ST_TYPE_STRING:  return TYPE_STRING;
+    default:              return TYPE_UNKNOWN;
+    }
+}
+
+/* Tipo de retorno de uma função, consultando a tabela de símbolos (ainda
+ * viva durante a geração da IR). Sem isso, chamadas void ganhariam um
+ * temporário de resultado indevidamente. */
+static IrType lookup_func_return_type(const char *name) {
+    if (!name) return TYPE_UNKNOWN;
+    Symbol *s = st_lookup_global(name);
+    if (!s || s->kind != SYM_FUNCTION) return TYPE_UNKNOWN;
+    return type_from_dt(s->type);
 }
 
 /* ===================== Utilitários de emissão ===================== */
@@ -292,7 +318,8 @@ static IrOperand gen_expr(GenCtx *ctx, Node *n) {
             nargs++;
         }
         IrOperand dst = ir_empty();
-        IrType rt = expr_ir_type(n);
+        IrType rt = lookup_func_return_type(n->name);
+        if (rt == TYPE_UNKNOWN) rt = expr_ir_type(n);
         if (rt != TYPE_VOID) {
             dst = new_temp_op(ctx, rt);
         }
@@ -330,6 +357,8 @@ static void push_loop(GenCtx *ctx, char *break_label, char *cont_label) {
 static void pop_loop(GenCtx *ctx) {
     if (!ctx->loop) return;
     LoopCtx *prev = ctx->loop->prev;
+    free(ctx->loop->break_label);
+    free(ctx->loop->continue_label);
     free(ctx->loop);
     ctx->loop = prev;
 }
@@ -520,13 +549,17 @@ static void gen_stmt(GenCtx *ctx, Node *n) {
         break;
 
     case NODE_PRINT: {
+        /* Gera o valor antes de emitir o print: assim qualquer instrução
+         * necessária para calcular a expressão aparece na ordem correta. */
+        int is_string = n->a && n->a->kind == NODE_STR;
+        IrOperand value = is_string ? ir_empty() : gen_expr(ctx, n->a);
         IrInstr *p = ir_emit(ctx->func, IR_PRINT);
-        if (n->a && n->a->kind == NODE_STR) {
+        if (is_string) {
             p->print_string = xstrdup(n->a->name ? n->a->name : "");
             p->arg1 = ir_empty();
         } else {
             p->print_string = NULL;
-            p->arg1 = gen_expr(ctx, n->a);
+            p->arg1 = value;
         }
         break;
     }
@@ -561,12 +594,11 @@ static void gen_stmt(GenCtx *ctx, Node *n) {
         break;
 
     case NODE_RETURN: {
+        /* Igual ao print: calcula a expressão primeiro e só depois emite
+         * o return, para não inverter a ordem das instruções. */
+        IrOperand value = n->a ? gen_expr(ctx, n->a) : ir_empty();
         IrInstr *r = ir_emit(ctx->func, IR_RETURN);
-        if (n->a) {
-            r->arg1 = gen_expr(ctx, n->a);
-        } else {
-            r->arg1 = ir_empty();
-        }
+        r->arg1 = value;
         break;
     }
 

@@ -302,7 +302,10 @@ static void ir_print_instr(FILE *out, const IrInstr *ins) {
     case IR_UNARY:
         fputs("    ", out);
         ir_print_operand(out, &ins->res);
-        fprintf(out, " = %s ", op_name(ins->unop));
+        /* op_name da AST descreve o operador de forma didática
+         * ("-(unario)"); na IR queremos a notação compacta. */
+        fprintf(out, " = %s ", ins->unop == OP_NOT ? "!" :
+                                ins->unop == OP_NEG ? "-" : op_name(ins->unop));
         ir_print_operand(out, &ins->arg1);
         fputc('\n', out);
         break;
