@@ -2,15 +2,15 @@
 func main() -> void
     locals: a: int, b: int, c: boolean, d: int, e: double, f: int, g: boolean
     temps: t0: int, t1: int, t2: int, t3: int, t4: boolean, t5: boolean, t6: boolean, t7: boolean, t8: int, t9: int, t10: int, t11: double, t12: double, t13: double, t14: int, t15: boolean, t16: boolean
-    t0 = 2 * 3
-    t1 = 1 + t0
-    a = t1
-    t2 = a - 2
-    t3 = t2 - 1
-    b = t3
-    t6 = ! true
-    t5 = t6
-    ifFalse t5 goto Land_false2
+    t0 = 6
+    t1 = 7
+    a = 7
+    t2 = 5
+    t3 = 4
+    b = 4
+    t6 = false
+    t5 = false
+    ifFalse false goto Land_false2
     t7 = a < b
     t5 = t7
     goto Land_end3

@@ -25,8 +25,8 @@ Lfor_end2:
     t3 = x > 0
     ifFalse t3 goto Lelse3
     y_1 = 3
-    t4 = y_1 + 1
-    y_1 = t4
+    t4 = 4
+    y_1 = 4
     goto Lendif4
 Lelse3:
     t5 = x < 0
