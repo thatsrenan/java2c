@@ -27,7 +27,6 @@ Lfor_cond4:
     t6 = j < 3
     ifFalse t6 goto Lfor_end6
     print j
-Lfor_cont5:
     t7 = j + 1
     j = t7
     goto Lfor_cond4
@@ -35,8 +34,6 @@ Lfor_end6:
 Ldo_body7:
     t8 = i - 1
     i = t8
-Ldo_cond8:
     t9 = i > 0
     if t9 goto Ldo_body7
-Ldo_end9:
 

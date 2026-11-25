@@ -24,7 +24,6 @@
 #include "ast.h"
 #include "ir.h"
 #include "ir_gen.h"
-#include "ir_opt.h"
 #include "semantic_flow.h"
 
 /* Gerados por Bison a partir de parser/parser.y (ver parser.tab.h) */
@@ -104,7 +103,6 @@ int main(int argc, char **argv) {
         if (only_ir) {
             /* Modo IR: imprime somente a representação intermediária. */
             ir_prog = ir_generate(ast_root);
-            ir_optimize(ir_prog);
             ir_print_program(stdout, ir_prog);
         } else if (only_ast) {
             /* Modo AST: imprime somente a AST (com @linha). */
