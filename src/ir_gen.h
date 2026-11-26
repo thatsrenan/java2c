@@ -4,7 +4,7 @@
 /*
  * ir_gen.h
  *
- * Geração de TAC (IR) a partir da AST do compilador.
+ * Geração de TAC (IR) otimizada a partir da AST do compilador.
  *
  * A entrada esperada é a AST construída e validada pelo parser/análise
  * semântica (ast_root). A saída é um IrProgram contendo globais e a IR
@@ -15,8 +15,9 @@
 #include "ir.h"
 
 /* Gera o programa IR a partir da raiz da AST. Retorna um IrProgram novo
- * (o chamador deve liberá-lo com ir_program_free). Se 'root' for NULL,
- * retorna um programa vazio.
+ * (o chamador deve liberá-lo com ir_program_free). O folding, a
+ * propagação e as outras otimizações da RI são aplicadas antes de
+ * retornar. Se 'root' for NULL, retorna um programa vazio.
  *
  * Pré-requisito: a tabela de símbolos precisa ter sido inicializada e
  * ainda estar ativa durante a chamada (st_init/st_free). O gerador

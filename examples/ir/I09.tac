@@ -21,12 +21,12 @@ func main() -> void
     print total
     total_1 = 5
     y = 1
-    print y
+    print 1
     y_1 = 2.5
-    print y_1
+    print 2.5
     y_1_1 = 3
-    param total_1
-    param y_1_1
+    param 5
+    param 3
     t0 = call f, 2
     param t0_1
     t1 = call g, 1

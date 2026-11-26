@@ -26,6 +26,11 @@ typedef struct {
  * 0 caso contrário (inclui divisão inteira por zero, que não é constante). */
 int const_eval(Node *n, ConstVal *out);
 
+/* Avaliam uma operacao tipada sobre valores ja constantes. Retornam 0
+ * quando a operacao nao pode ser avaliada, como divisao inteira por zero. */
+int const_eval_unary(OpKind op, ConstVal operand, ConstVal *out);
+int const_eval_binary(OpKind op, ConstVal left, ConstVal right, ConstVal *out);
+
 /* Converte uma constante para o tipo 't' com as regras de cast do Java. */
 ConstVal const_convert(ConstVal c, Type t);
 

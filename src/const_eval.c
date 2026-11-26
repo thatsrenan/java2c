@@ -20,6 +20,14 @@ static ConstVal mk_real(double v, Type t) {
     return c;
 }
 
+static int32_t wrap_int32(int64_t v) {
+    const int64_t modulus = INT64_C(4294967296);
+    int64_t wrapped = v % modulus;
+    if (wrapped < 0) wrapped += modulus;
+    if (wrapped >= INT64_C(2147483648)) wrapped -= modulus;
+    return (int32_t)wrapped;
+}
+
 static double as_real(ConstVal c) {
     return is_real(c.type) ? c.d : (double)c.i;
 }
@@ -51,12 +59,96 @@ ConstVal const_convert(ConstVal c, Type t) {
         return mk_int(c.i ? 1 : 0, t);
     long v = is_real(c.type) ? (long)c.d : c.i;
     if (t == TYPE_CHAR) return mk_int((uint16_t)v, TYPE_CHAR);
-    return mk_int((int32_t)v, TYPE_INT);
+    return mk_int((long)wrap_int32((int64_t)v), TYPE_INT);
 }
 
 static int is_relational(OpKind op) {
     return op == OP_LT || op == OP_GT || op == OP_LE || op == OP_GE ||
            op == OP_EQ || op == OP_NE;
+}
+
+int const_eval_unary(OpKind op, ConstVal a, ConstVal *out) {
+    if (!out) return 0;
+    if (op == OP_NOT) {
+        *out = mk_int(!a.i, TYPE_BOOLEAN);
+        return 1;
+    }
+    if (op != OP_NEG) return 0;
+    if (is_real(a.type)) {
+        *out = mk_real(-a.d, a.type);
+        return 1;
+    }
+    *out = mk_int((long)wrap_int32(-(int64_t)(int32_t)a.i), TYPE_INT);
+    return 1;
+}
+
+int const_eval_binary(OpKind op, ConstVal l, ConstVal r, ConstVal *out) {
+    if (!out) return 0;
+    if (op == OP_AND || op == OP_OR) {
+        int v = (op == OP_AND) ? (l.i && r.i) : (l.i || r.i);
+        *out = mk_int(v, TYPE_BOOLEAN);
+        return 1;
+    }
+    if (is_relational(op)) {
+        int v;
+        if (is_real(l.type) || is_real(r.type)) {
+            double a = as_real(l), b = as_real(r);
+            switch (op) {
+            case OP_LT: v = a <  b; break;
+            case OP_GT: v = a >  b; break;
+            case OP_LE: v = a <= b; break;
+            case OP_GE: v = a >= b; break;
+            case OP_EQ: v = a == b; break;
+            default:    v = a != b; break;
+            }
+        } else {
+            long a = l.i, b = r.i;
+            switch (op) {
+            case OP_LT: v = a <  b; break;
+            case OP_GT: v = a >  b; break;
+            case OP_LE: v = a <= b; break;
+            case OP_GE: v = a >= b; break;
+            case OP_EQ: v = a == b; break;
+            default:    v = a != b; break;
+            }
+        }
+        *out = mk_int(v, TYPE_BOOLEAN);
+        return 1;
+    }
+
+    Type t = promote(l.type, r.type);
+    if (is_real(t)) {
+        double a = as_real(l), b = as_real(r), v;
+        switch (op) {
+        case OP_ADD:  v = a + b; break;
+        case OP_SUB:  v = a - b; break;
+        case OP_MULT: v = a * b; break;
+        case OP_DIV:  v = a / b; break;
+        default: return 0;
+        }
+        *out = const_convert(mk_real(v, TYPE_DOUBLE), t);
+        return 1;
+    }
+
+    int64_t a = (int32_t)l.i, b = (int32_t)r.i, v;
+    switch (op) {
+    case OP_ADD:  v = a + b; break;
+    case OP_SUB:  v = a - b; break;
+    case OP_MULT: v = a * b; break;
+    case OP_DIV:
+        if (b == 0) return 0;
+        if (a == INT32_MIN && b == -1) v = INT32_MIN;
+        else v = a / b;
+        break;
+    case OP_MOD:
+        if (b == 0) return 0;
+        if (a == INT32_MIN && b == -1) v = 0;
+        else v = a % b;
+        break;
+    default: return 0;
+    }
+    *out = mk_int((long)wrap_int32(v), TYPE_INT);
+    return 1;
 }
 
 int const_eval(Node *n, ConstVal *out) {
@@ -86,71 +178,13 @@ int const_eval(Node *n, ConstVal *out) {
     case NODE_UNARY: {
         ConstVal a;
         if (!const_eval(n->a, &a)) return 0;
-        if (n->op == OP_NOT)       *out = mk_int(!a.i, TYPE_BOOLEAN);
-        else if (is_real(a.type))  *out = mk_real(-a.d, a.type);
-        else                       *out = const_convert(mk_int(-a.i, TYPE_INT), TYPE_INT);
-        return 1;
+        return const_eval_unary(n->op, a, out);
     }
 
     case NODE_BINOP: {
         ConstVal l, r;
         if (!const_eval(n->a, &l) || !const_eval(n->b, &r)) return 0;
-        if (n->op == OP_AND || n->op == OP_OR) {
-            int v = (n->op == OP_AND) ? (l.i && r.i) : (l.i || r.i);
-            *out = mk_int(v, TYPE_BOOLEAN);
-            return 1;
-        }
-        if (is_relational(n->op)) {
-            int v;
-            if (is_real(l.type) || is_real(r.type)) {
-                double a = as_real(l), b = as_real(r);
-                switch (n->op) {
-                case OP_LT: v = a <  b; break;
-                case OP_GT: v = a >  b; break;
-                case OP_LE: v = a <= b; break;
-                case OP_GE: v = a >= b; break;
-                case OP_EQ: v = a == b; break;
-                default:    v = a != b; break;
-                }
-            } else {
-                long a = l.i, b = r.i;
-                switch (n->op) {
-                case OP_LT: v = a <  b; break;
-                case OP_GT: v = a >  b; break;
-                case OP_LE: v = a <= b; break;
-                case OP_GE: v = a >= b; break;
-                case OP_EQ: v = a == b; break;
-                default:    v = a != b; break;
-                }
-            }
-            *out = mk_int(v, TYPE_BOOLEAN);
-            return 1;
-        }
-        Type t = promote(l.type, r.type);
-        if (is_real(t)) {
-            double a = as_real(l), b = as_real(r), v;
-            switch (n->op) {
-            case OP_ADD:  v = a + b; break;
-            case OP_SUB:  v = a - b; break;
-            case OP_MULT: v = a * b; break;
-            case OP_DIV:  v = a / b; break;
-            default: return 0; /* % de reais não é válido no subconjunto */
-            }
-            *out = const_convert(mk_real(v, TYPE_DOUBLE), t);
-            return 1;
-        }
-        /* inteiros: calcula em 64 bits e reduz a 32 (wrap-around do Java) */
-        long a = (int32_t)l.i, b = (int32_t)r.i, v;
-        switch (n->op) {
-        case OP_ADD:  v = a + b; break;
-        case OP_SUB:  v = a - b; break;
-        case OP_MULT: v = a * b; break;
-        case OP_DIV:  if (b == 0) return 0; v = a / b; break;
-        case OP_MOD:  if (b == 0) return 0; v = a % b; break;
-        default: return 0;
-        }
-        *out = const_convert(mk_int(v, TYPE_INT), TYPE_INT);
-        return 1;
+        return const_eval_binary(n->op, l, r, out);
     }
 
     default:

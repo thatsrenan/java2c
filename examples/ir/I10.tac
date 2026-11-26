@@ -26,8 +26,8 @@ func main() -> void
     letra = 99
     d = 66
     print b
-    print c
-    param d
+    print 5
+    param 66
     t1 = call proxima, 1
     print t1
     print letra

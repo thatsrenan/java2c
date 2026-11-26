@@ -7,6 +7,7 @@
 
 #include "symbol_table.h"
 #include "const_eval.h"
+#include "ir_opt.h"
 
 /*
  * ir_gen.c
@@ -986,7 +987,10 @@ static void gen_implicit_main(GenCtx *ctx, Node *block) {
 
 IrProgram *ir_generate(Node *root) {
     IrProgram *prog = ir_program_new();
-    if (!root) return prog;
+    if (!root) {
+        ir_optimize(prog);
+        return prog;
+    }
 
     GenCtx ctx;
     memset(&ctx, 0, sizeof ctx);
@@ -1000,6 +1004,7 @@ IrProgram *ir_generate(Node *root) {
         ctx.func = f;
         gen_stmt(&ctx, classNode);
         locals_restore(&ctx, NULL);
+        ir_optimize(prog);
         return prog;
     }
 
@@ -1034,5 +1039,6 @@ IrProgram *ir_generate(Node *root) {
         fn = next;
     }
     locals_restore(&ctx, NULL);
+    ir_optimize(prog);
     return prog;
 }
