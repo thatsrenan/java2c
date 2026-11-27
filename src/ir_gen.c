@@ -156,7 +156,10 @@ static int is_c_reserved(const char *s) {
         "sizeof", "struct", "typedef", "union", "unsigned", "volatile",
         "_Bool", "_Complex", "_Imaginary", "_Alignas", "_Alignof",
         "_Atomic", "_Generic", "_Noreturn", "_Static_assert",
-        "_Thread_local", "printf", NULL
+        "_Thread_local", "printf", "bool", "int32_t", "uint16_t",
+        "stdout", "stderr", "putchar", "snprintf", "strtod", "strpbrk",
+        "strcat", "puts", "__j2c_main", "__j2c_init_globals",
+        "__j2c_print_real", "__j2c_print_char", NULL
     };
     for (int i = 0; words[i]; i++)
         if (strcmp(s, words[i]) == 0) return 1;
@@ -174,7 +177,9 @@ static int looks_like_temp(const char *s) {
 /* Um nome de variável está ocupado se colide com palavra reservada,
  * temporário, função, global ou outra variável da função atual. */
 static int var_name_taken(GenCtx *ctx, const char *s) {
-    if (is_c_reserved(s) || looks_like_temp(s)) return 1;
+    /* 'main' e a funcao C de entrada gerada, logo nao pode ser variavel. */
+    if (is_c_reserved(s) || looks_like_temp(s) || strcmp(s, "main") == 0)
+        return 1;
     for (FuncName *fn = ctx->funcs; fn; fn = fn->next)
         if (strcmp(fn->ir_name, s) == 0) return 1;
     for (IrGlobal *g = ctx->prog->globals; g; g = g->next)
