@@ -41,12 +41,12 @@ $(BUILD_DIR)/lex.yy.c: $(LEXER_DIR)/lexer.l $(BUILD_DIR)/parser.tab.h
 	flex -o $(BUILD_DIR)/lex.yy.c $(LEXER_DIR)/lexer.l
 
 PARSER_SRCS = $(SRC_DIR)/main.c $(SRC_DIR)/symbol_table.c $(SRC_DIR)/ir.c $(SRC_DIR)/ir_gen.c \
-              $(SRC_DIR)/ir_opt.c \
+              $(SRC_DIR)/ir_opt.c $(SRC_DIR)/codegen.c \
               $(SRC_DIR)/const_eval.c $(SRC_DIR)/semantic_flow.c \
               $(BUILD_DIR)/parser.tab.c $(BUILD_DIR)/lex.yy.c $(PARSER_DIR)/ast.c
 
 IR_HDRS = $(SRC_DIR)/ir.h $(SRC_DIR)/ir_gen.h $(SRC_DIR)/ir_opt.h \
-          $(SRC_DIR)/const_eval.h $(SRC_DIR)/semantic_flow.h
+          $(SRC_DIR)/codegen.h $(SRC_DIR)/const_eval.h $(SRC_DIR)/semantic_flow.h
 
 protoparser: $(PARSER_SRCS) $(PARSER_DIR)/ast.h $(SRC_DIR)/symbol_table.h $(IR_HDRS)
 	$(CC) $(CFLAGS) -o protoparser $(PARSER_SRCS)
@@ -76,6 +76,23 @@ ir_opt_test: tests/ir_opt_test.c $(SRC_DIR)/ir_opt.c $(SRC_DIR)/ir.c \
 
 test-ir-opt: ir_opt_test
 	@./ir_opt_test
+
+# Testa o gerador de C diretamente sobre IR construida a mao (sem lexer/parser).
+codegen_test: tests/codegen_test.c $(SRC_DIR)/codegen.c $(SRC_DIR)/ir.c \
+              $(SRC_DIR)/codegen.h $(SRC_DIR)/ir.h $(PARSER_DIR)/ast.h \
+              $(PARSER_DIR)/ast.c
+	$(CC) $(CFLAGS) -Wextra -g $(SANITIZE) -o codegen_test \
+		tests/codegen_test.c $(SRC_DIR)/codegen.c $(SRC_DIR)/ir.c \
+		$(PARSER_DIR)/ast.c
+
+test-codegen: codegen_test
+	@./codegen_test
+
+# Compila e executa os programas Java de examples/codegen ponta a ponta.
+test-codegen-check: protoparser
+	@mkdir -p $(BUILD_DIR)/codegen
+	@bash tests/check_codegen.sh ./protoparser examples/codegen
+
 test: protoparser
 	./protoparser examples/exemplo1.java
 
@@ -141,7 +158,7 @@ test-ir-check: protoparser
 	@bash tests/check_ir.sh ./protoparser examples/ir
 
 # Todas as conferências automáticas que já devem passar.
-check: test-check test-ast test-ir-opt test-sintaxe test-ast-parser test-mem test-escopo-check test-ir-check
+check: test-check test-ast test-ir-opt test-codegen test-sintaxe test-ast-parser test-mem test-escopo-check test-ir-check test-codegen-check
 
 test-escopo: protoparser
 	@for f in examples/escopo/*.java; do \
@@ -168,6 +185,6 @@ test-all-save: protoparser lextest asttest
 	@echo "Resultados salvos em build/resultados/{tokens,lexico,escopo,ast,ast-parser,sintaxe}.txt"
 
 clean:
-	rm -rf protoparser protoparser-san lextest asttest ir_opt_test ir_opt_test.exe protoparser.exe protoparser-san.exe lextest.exe asttest.exe $(BUILD_DIR)
+	rm -rf protoparser protoparser-san lextest asttest ir_opt_test codegen_test ir_opt_test.exe codegen_test.exe protoparser.exe protoparser-san.exe lextest.exe asttest.exe $(BUILD_DIR)
 
-.PHONY: all test test-tokens test-lexico test-check test-ast test-sintaxe test-ast-parser test-mem test-escopo-check test-ir-check check test-escopo test-all-save test-ir-opt clean
+.PHONY: all test test-tokens test-lexico test-check test-ast test-sintaxe test-ast-parser test-mem test-escopo-check test-ir-check test-codegen test-codegen-check check test-escopo test-all-save test-ir-opt clean
