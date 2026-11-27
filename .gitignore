@@ -4,4 +4,6 @@ build/
 protoparser
 lextest
 asttest
+ir_opt_test
+codegen_test
 protoparser-san

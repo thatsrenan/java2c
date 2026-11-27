@@ -7,8 +7,8 @@
 # Os casos invalidos importam: neles o parser para no meio e quem libera as
 # subarvores ja montadas sao os %destructor do parser.y.
 #
-# Cada arquivo roda duas vezes: no modo padrao e com --ir, para cobrir
-# tambem a montagem/liberacao da representacao intermediaria (TAC).
+# Cada arquivo roda em quatro modos: padrao, --ir, --c e --c-clean (com saida
+# em /dev/null), para cobrir a montagem/liberacao da IR e os dois geradores de C.
 #
 # Uso:  bash tests/check_mem.sh [caminho-do-protoparser-san] [diretorio...]
 #       (padrao: ./protoparser-san  examples/*/ e examples/*.java)
@@ -47,7 +47,7 @@ for d in "${DIRS[@]}"; do
     for f in "${d%/}"/*.java; do
         [ -e "$f" ] || continue
         total=$((total + 1))
-        for mode in "" "--ir"; do
+        for mode in "" "--ir" "--c -o /dev/null" "--c-clean -o /dev/null"; do
             "$PARSER" $mode "$f" > /dev/null 2> "$errf"
             rc=$?
             if [ "$rc" -gt 1 ] || grep -qE 'Sanitizer|runtime error' "$errf"; then
