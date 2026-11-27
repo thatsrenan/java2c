@@ -1,9 +1,11 @@
 .vscode/
 
 build/
+site/
 protoparser
 lextest
 asttest
 ir_opt_test
 codegen_test
 protoparser-san
+.venv/

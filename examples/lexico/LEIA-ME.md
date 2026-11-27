@@ -1,45 +1,81 @@
-# Como ler `RESULTADOS.txt`
+# Como ler os testes léxicos
 
-Este arquivo contém a saída real do `protoparser` para cada um dos 43 casos
-de teste léxico (`L01.java` a `L43.java`), gerada rodando de fato:
+## Visão geral
+
+Esta pasta contém **56 casos** (`L01.java` a `L56.java`) e dois arquivos de
+referência com papéis diferentes:
+
+| Arquivo | Papel |
+| --- | --- |
+| `esperado.txt` | Manifesto **atual**, usado por `tests/check.sh` e por `make test-check` |
+| `RESULTADOS.txt` | Registro histórico da saída do `protoparser` para os 43 primeiros casos |
+
+O manifesto é a referência automática. `RESULTADOS.txt` não é usado pelos
+testes: ele mostra como os casos se comportavam quando o projeto expunha apenas
+o compilador completo, antes da criação do harness isolado do lexer.
+
+## Executando os testes
 
 ```bash
-./protoparser examples/lexico/LNN.java
+make
+make test-check
 ```
 
-## Importante: léxico vs. sintático
+`make test-check` roda `tests/check.sh ./lextest examples/lexico`.
+`lextest` é um harness que **não liga o parser**: ele chama `yylex()` em
+laço e imprime um token por linha:
 
-O protótipo atual não expõe o analisador léxico isoladamente — ele já vem
-acoplado ao parser Bison. Isso significa que:
+```text
+linha  TOKEN             lexema
+```
 
-- Casos que testam **apenas um token ou fragmento solto** (ex.: `L01.java`
-  contém só `while`, `L06.java` contém só `2x`) são **lexicamente
-  corretos**, mas o parser acusa `ERRO DE SINTAXE`, porque a gramática
-  espera uma instrução completa (declaração, atribuição, `if`, `while`
-  etc.), não um token avulso.
-  → Nesses casos, o que importa observar é se **não aparece** a mensagem
-  `ERRO LEXICO`. Se só aparecer `ERRO DE SINTAXE`, o lexer fez o trabalho
-  certo (reconheceu o token) e quem "reclamou" foi o parser, como esperado.
+O formato de `esperado.txt` é:
 
-- Casos com `int x = 10 @ 5;` (`L34`), string não terminada (`L21`), char
-  malformado (`L17`–`L19`), comentário de bloco sem fechar (`L26`), etc.
-  devem mostrar a mensagem `ERRO LEXICO na linha N: ...` — esse sim é o
-  sinal de que o lexer está funcionando corretamente.
+```text
+NOME  ok      : TOKEN TOKEN ...
+NOME  erro N  : TOKEN TOKEN ...
+```
 
-- Casos com instrução completa e válida (`L07`, `L08`, `L14`, `L20`, `L23`,
-  `L24`, `L25`, `L28`–`L31`, `L39`, `L40`, `L41`) devem terminar com
-  `Analise concluida sem erros` e `exit code: 0`.
+Depois de `:` vem a sequência exata de tokens que o lexer deve devolver; os
+tokens descartados por erro não aparecem. Um caso passa apenas se status,
+quantidade de erros e sequência de tokens forem iguais ao esperado.
 
-## Resumo rápido por resultado esperado
+Para inspecionar a saída de todos os casos:
 
-| Resultado no `RESULTADOS.txt` | Significa |
-|---|---|
-| `ERRO LEXICO na linha N` presente | Lexer rejeitou corretamente um caractere/lexema inválido |
-| Só `ERRO DE SINTAXE`, sem `ERRO LEXICO` | Lexer aceitou os tokens; quem barrou foi a gramática (normal para fragmentos soltos como L01–L06, L09, L32, L37, L38, L42, L43) |
-| `Analise concluida sem erros` | Caso totalmente válido, léxico e sintático |
+```bash
+make test-lexico
+```
 
-Para isolar só o comportamento léxico sem depender do parser, uma extensão
-futura recomendada é compilar `lexer.l` sozinho (com um `main()` mínimo que
-só chama `yylex()` em loop e imprime cada token), sem ligar ao Bison. Isso
-não foi feito neste protótipo porque o objetivo da issue original era
-validar a integração Flex+Bison, não o lexer isolado.
+## Léxico versus sintático
+
+`RESULTADOS.txt` registra a saída do `protoparser`, que usa Flex **e** Bison.
+Por isso é comum ver `ERRO DE SINTAXE` em casos que testam apenas um fragmento:
+
+- Casos como `L01.java` (só `while`), `L02.java` (só `whileLoop`) e `L03.java`
+  (só `int`) são **lexicamente corretos**: o token foi reconhecido, mas a
+  gramática espera uma instrução completa. Nesses casos, o que importa é a
+  ausência de `ERRO LEXICO`.
+- Casos como `L06.java` (`2x`), `L17.java`–`L19.java` (char malformado),
+  `L21.java` (string não terminada), `L26.java` (comentário sem fechar),
+  `L44.java`–`L47.java` (reais malformados ou fora do intervalo), `L55.java`
+  (inteiro fora do intervalo) e `L56.java` (real `float` fora do intervalo)
+  devem apresentar `ERRO LEXICO na linha N: ...`.
+- Casos completos e válidos (por exemplo `L07`, `L08`, `L14`, `L20`, `L23`,
+  `L24`, `L25`, `L28`–`L31`, `L39`–`L43`, `L50`, `L51`, `L53`) terminam sem
+  erros léxicos.
+
+Com `lextest`, essa distinção desaparece: a saída contém apenas os tokens e as
+mensagens de erro do lexer, sem o parser.
+
+## Quebras recentes cobertas pelos casos
+
+Os casos `L44` a `L56` cobrem decisões que antes apareciam como pendentes na
+documentação e hoje estão implementadas em `lexer/lexer.l`:
+
+- reais malformados (`1.5e`, `1.5abc`) e estouro de `double`/`float`;
+- inteiro maior que `INT_MAX`;
+- escapes válidos e inválidos em strings;
+- BOM UTF-8 e bytes não-ASCII fora de literais/comentários.
+
+O significado de cada linha de `esperado.txt` está documentado no cabeçalho do
+próprio arquivo e em [Executando testes](../../docs/guides/testing.md).
