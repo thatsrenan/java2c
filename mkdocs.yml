@@ -1,0 +1,101 @@
+site_name: java2c
+site_description: >-
+  Documentação técnica do java2c, compilador do subconjunto procedural de
+  Java para C implementado com Flex, Bison e C.
+site_url: https://thatsrenan.github.io/java2c/
+repo_url: https://github.com/thatsrenan/java2c
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: pt-BR
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - navigation.footer
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.action.edit
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Alternar para o modo escuro
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Alternar para o modo claro
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+
+validation:
+  nav:
+    not_found: warn
+  links:
+    not_found: warn
+    anchors: warn
+
+nav:
+  - Início: index.md
+  - Introdução:
+      - Visão geral: introduction/overview.md
+  - Primeiros passos:
+      - Instalação: getting-started/installation.md
+      - Configuração: getting-started/configuration.md
+      - Início rápido: getting-started/quick-start.md
+  - Arquitetura:
+      - Visão geral: architecture/overview.md
+      - Estrutura do repositório: architecture/structure.md
+      - Fluxo de compilação: architecture/pipeline.md
+      - Tabela de símbolos: architecture/symbol-table.md
+      - Representação intermediária e código C: architecture/ir-and-codegen.md
+  - Guias:
+      - Usando o compilador: guides/usage.md
+      - Executando testes: guides/testing.md
+  - Referência:
+      - Linha de comando: reference/cli.md
+      - API da AST: reference/ast-api.md
+      - API da tabela de símbolos: reference/symbol-table-api.md
+      - API da IR e geração de C: reference/ir-api.md
+      - Especificações da linguagem:
+          - Escopo, sintaxe e semântica: definicao-escopo-sintaxe-semantica.md
+          - Definição de tokens: definicao-tokens.md
+          - Tabela de símbolos: tabela-simbolos.md
+  - Desenvolvimento:
+      - Ambiente de desenvolvimento: development/development-setup.md
+      - Padrões e convenções: development/conventions.md
+      - Contribuindo: development/contributing.md
+      - Documentação do projeto: development/documentation.md
+      - Declaração de uso de IA: development/ai-usage.md
