@@ -17,11 +17,18 @@ A especificação estabelece:
 * espaços em branco;
 * regras de prioridade e desambiguação;
 * situações de erro léxico;
-* decisões que ainda precisam ser definidas antes da implementação definitiva do analisador léxico.
+* decisões consolidadas na implementação atual.
 
-O analisador léxico deve transformar a sequência de caracteres do código-fonte em uma sequência de tokens que será utilizada posteriormente pelo analisador sintático.
+O analisador léxico transforma a sequência de caracteres do código-fonte em uma sequência de tokens utilizada posteriormente pelo analisador sintático.
 
 Esta especificação está subordinada ao escopo definido na **Especificação da Linguagem Java Suportada pelo Compilador**.
+
+> **Estado do documento:** revisado para descrever o `lexer/lexer.l` presente no
+> repositório. Decisões antes marcadas como "pendentes" — escapes em `char` e
+> string, notação científica, sufixos `f`/`d`, colchetes e limites de inteiro —
+> já estão implementadas e registradas abaixo. O PDF
+> `especificacao-java-subset.pdf` é um rascunho histórico, não a referência do
+> comportamento atual.
 
 ---
 
@@ -56,6 +63,7 @@ As seguintes palavras-chave fazem parte do subconjunto suportado:
 | `BOOLEAN`  | `boolean`  |
 | `CHAR`     | `char`     |
 | `VOID`     | `void`     |
+| `STRING_TYPE` | `String` |
 | `IF`       | `if`       |
 | `ELSE`     | `else`     |
 | `WHILE`    | `while`    |
@@ -101,10 +109,11 @@ INTEGER_LITERAL
 
 ```java
 123abc
-12.34
 ```
 
-O tratamento de formas numéricas mais avançadas, como notação científica, não faz parte da especificação atual.
+`123abc` é rejeitado como `literal numerico malformado`. Já `12.34` é um
+`REAL_LITERAL` válido. Inteiros são limitados a `INT_MAX`: `2147483648` é
+rejeitado, inclusive quando usado como operando de menos unário.
 
 ---
 
@@ -118,10 +127,15 @@ Literais reais representam valores utilizados nos tipos `float` e `double`.
 REAL_LITERAL
 ```
 
-### Padrão atualmente adotado
+### Padrões atualmente adotados
+
+O lexer reconhece três formas de `REAL_LITERAL` (definições `EXP` e regras em
+`lexer/lexer.l`):
 
 ```text
-[0-9]+\.[0-9]+
+[0-9]+\.[0-9]+([eE][+-]?[0-9]+)?[fFdD]?
+[0-9]+[eE][+-]?[0-9]+[fFdD]?
+[0-9]+[fFdD]
 ```
 
 ### Exemplos
@@ -131,19 +145,26 @@ REAL_LITERAL
 10.0
 7.5
 0.25
+5.5e10
+7E-2
+10e3
+25d
+3.14f
 ```
 
 ### Observação
 
-A especificação atual não diferencia lexicalmente `float` de `double`.
-
-Portanto, nesta versão:
+O sufixo `f`/`F` marca o literal como `float`; os demais são `double`. O lexer
+valida o intervalo: `1e999` é erro de overflow e `1e39f` excede `FLT_MAX`.
+Expoentes sem dígitos (`1.5e`) e literais malformados (`1.5abc`) também são
+erros léxicos.
 
 ```text
 3.14
 ```
 
-é reconhecido como `REAL_LITERAL`, cabendo à análise sintática e semântica determinar o contexto e o tipo correspondente.
+é reconhecido como `REAL_LITERAL` sem sufixo e tratado como `double`; o contexto
+e as regras de promoção definem o tipo final na análise semântica.
 
 ---
 
@@ -201,18 +222,26 @@ CHAR_LITERAL
 
 A definição atual considera um único caractere entre aspas simples.
 
-### Decisão pendente
+### Escapes suportados
 
-Ainda deve ser decidido se sequências de escape serão suportadas, por exemplo:
+Sequências de escape são suportadas tanto em `char` quanto em string, com os
+mesmos caracteres de Java e C (a geração de C pode copiá-las sem tradução):
 
 ```java
 '\n'
 '\t'
+'\r'
+'\b'
+'\f'
+'\0'
 '\\'
 '\''
+'"'
 ```
 
-Caso escapes não sejam implementados, qualquer ocorrência desse tipo deverá resultar em erro léxico.
+Um escape fora desse conjunto (`'\q'`) ou um literal com mais de um caractere
+(`'ab'`) é erro léxico; o lexer também detecta literal vazio e literal não
+terminado.
 
 ---
 
@@ -259,15 +288,15 @@ Exemplo não permitido:
 String mensagem = "Olá";
 ```
 
-### Decisões pendentes
+### Decisões consolidadas
 
-Ainda deve ser definido:
-
-* se caracteres de escape serão suportados;
-* se `\n`, `\t`, `\"` e `\\` serão aceitos;
-* se strings podem conter caracteres Unicode;
-* se strings podem conter quebras de linha;
-* qual será o comportamento para uma string não terminada.
+* Escapes do mesmo conjunto de `char` são aceitos, incluindo `\n`, `\t`,
+  `\"` e `\\`. Um escape inválido, como em `"a\qb"`, gera erro léxico.
+* Identificadores e literais usam ASCII; bytes não-ASCII fora de literais e
+  comentários são rejeitados. Um BOM UTF-8 no início da linha é ignorado.
+* Quebras de linha não são permitidas dentro de uma string.
+* String não terminada gera `ERRO LEXICO na linha N: string literal nao
+  terminada.`
 
 ---
 
@@ -440,22 +469,19 @@ String[] args
 
 O documento de escopo define essa assinatura como uma exceção tratada especialmente.
 
-### Decisão pendente
+### Decisão consolidada
 
-É necessário decidir se `[` e `]` serão reconhecidos pelo analisador léxico:
+`[` e `]` são reconhecidos pelo analisador léxico como `LBRACKET` e `RBRACKET`:
 
 ```text
 LBRACKET  [
 RBRACKET  ]
 ```
 
-Mesmo que arrays não sejam suportados em outras partes da linguagem.
-
-### Recomendação
-
-Reconhecer `[` e `]` como tokens e permitir seu uso exclusivamente na assinatura especial de `main`.
-
-Isso evita que o lexer precise tratar `String[] args` como uma construção lexical especial.
+O lexer não precisa de uma regra especial para `String[] args`: a gramática
+aceita a sequência `STRING_TYPE LBRACKET RBRACKET IDENTIFIER` apenas como
+parâmetro de `main`. Em qualquer outro contexto, colchetes causam erro de
+sintaxe. Arrays continuam fora do subconjunto.
 
 ---
 
@@ -684,14 +710,12 @@ int x = 10 @ 5;
 Resultado esperado:
 
 ```text
-ERRO LÉXICO: caractere '@' não reconhecido.
+ERRO LEXICO na linha 1: caractere '@' nao reconhecido.
 ```
 
-O erro deve indicar, quando possível:
-
-* o caractere ou lexema inválido;
-* a linha;
-* a coluna.
+A mensagem indica o caractere ou lexema inválido e a linha (`yylineno`). O
+lexer não reporta coluna; a localização usada pelo restante do compilador é a
+linha, inclusive nas anotações `@linha` da AST.
 
 ---
 
@@ -782,14 +806,19 @@ Quando um erro léxico for encontrado, o analisador deve:
 4. sinalizar que a análise léxica falhou;
 5. impedir a geração de código C para o programa inválido.
 
-Exemplo:
+Na implementação atual, o lexer escreve em `stderr`, usa o prefixo `ERRO
+LEXICO na linha N`, marca `had_lexical_error = 1`, descarta o token inválido e
+continua a análise. `main.c` verifica essa flag depois de `yyparse()` e impede
+a geração de IR e de C mesmo quando o parser termina "com sucesso".
+
+Exemplo real:
 
 ```text
-ERRO LÉXICO na linha 4, coluna 12:
-caractere '@' não reconhecido.
+ERRO LEXICO na linha 1: caractere '@' nao reconhecido.
 ```
 
-A especificação geral do compilador determina que programas com erros léxicos, sintáticos ou semânticos não devem gerar código C.
+Programas com erros léxicos, sintáticos ou semânticos não geram código C e
+terminam com código de saída `1`.
 
 ---
 
@@ -806,6 +835,7 @@ A especificação geral do compilador determina que programas com erros léxicos
 | Palavra-chave | `BOOLEAN`         | `boolean`                |
 | Palavra-chave | `CHAR`            | `char`                   |
 | Palavra-chave | `VOID`            | `void`                   |
+| Palavra-chave | `STRING_TYPE`     | `String`                 |
 | Palavra-chave | `IF`              | `if`                     |
 | Palavra-chave | `ELSE`            | `else`                   |
 | Palavra-chave | `WHILE`           | `while`                  |
@@ -817,7 +847,7 @@ A especificação geral do compilador determina que programas com erros léxicos
 | Literal       | `TRUE`            | `true`                   |
 | Literal       | `FALSE`           | `false`                  |
 | Literal       | `INTEGER_LITERAL` | `[0-9]+`                 |
-| Literal       | `REAL_LITERAL`    | `[0-9]+\.[0-9]+`         |
+| Literal       | `REAL_LITERAL`    | decimal, expoente e sufixo `f`/`d` (ver §4.2) |
 | Literal       | `CHAR_LITERAL`    | `'caractere'`            |
 | Literal       | `STRING_LITERAL`  | `"texto"`                |
 | Identificador | `IDENTIFIER`      | `[a-zA-Z_][a-zA-Z0-9_]*` |
@@ -849,6 +879,8 @@ A especificação geral do compilador determina que programas com erros léxicos
 | Delimitador   | `SEMICOLON`       | `;`                      |
 | Delimitador   | `COMMA`           | `,`                      |
 | Delimitador   | `DOT`             | `.`                      |
+| Delimitador   | `LBRACKET`        | `[`                      |
+| Delimitador   | `RBRACKET`        | `]`                      |
 
 ---
 
@@ -877,145 +909,42 @@ e:
 /* ... */
 ```
 
-O lexer deve simplesmente ignorá-los, mantendo a contagem de linha e coluna.
+O lexer simplesmente os ignora e mantém a contagem de linha (`yylineno`),
+usada tanto nas mensagens de erro quanto nas anotações `@linha` da AST.
 
 ---
 
-# 16. Decisões ainda pendentes
+# 16. Decisões consolidadas na implementação
 
-A especificação atual resolve a estrutura principal dos tokens, mas as seguintes decisões ainda precisam ser tomadas antes de considerar a especificação lexical totalmente definitiva.
+As decisões que antes apareciam como pendentes foram resolvidas no
+`lexer/lexer.l` atual:
 
-## 16.1 Literais de caractere
+| Tema | Decisão implementada |
+| --- | --- |
+| Escapes em `char` e string | Aceitos `\n`, `\t`, `\r`, `\b`, `\f`, `\0`, `\\`, `\'` e `\"`; escape fora desse conjunto é erro léxico |
+| Notação científica | Aceita em reais com ou sem parte decimal (`1e10`, `2.5e-3`) |
+| Sufixo `f`/`d` | Aceito em reais; `f`/`F` marca `float`, `d`/`D` e a ausência de sufixo marcam `double` |
+| Colchetes | Reconhecidos como `LBRACKET`/`RBRACKET`; a gramática permite `String[] args` apenas em `main` |
+| Identificadores Unicode | Não suportados: `[a-zA-Z_][a-zA-Z0-9_]*` |
+| Intervalo de reais | `strtod` com verificação de infinito e de `FLT_MAX` quando há sufixo `f` |
+| Intervalo de inteiros | Limitado a `INT_MAX` |
 
-Decidir se serão aceitos escapes:
-
-```java
-'\n'
-'\t'
-'\\'
-'\''
-```
-
-### Recomendação
-
-Para a primeira versão, não suportar escapes e aceitar apenas um caractere simples.
-
----
-
-## 16.2 Literais de string
-
-Decidir se serão aceitos escapes:
-
-```java
-"\n"
-"\t"
-"\""
-"\\"
-```
-
-### Recomendação
-
-Para a primeira versão, manter strings simples e sem escapes.
-
----
-
-## 16.3 Notação científica
-
-Ainda não está definido se devem ser aceitos valores como:
-
-```java
-1e10
-2.5e-3
-```
-
-### Recomendação
-
-Não suportar inicialmente.
-
----
-
-## 16.4 Sufixo de literais `float`
-
-Ainda não está definido se será permitido:
-
-```java
-3.14f
-```
-
-### Recomendação
-
-Não suportar inicialmente.
-
----
-
-## 16.5 `float` e `double`
-
-Ainda precisa ser definida a relação entre:
-
-```text
-REAL_LITERAL
-```
-
-e os tipos:
-
-```text
-float
-double
-```
-
-A especificação atual não diferencia lexicalmente os dois.
-
-Essa diferenciação pode ser feita posteriormente na análise semântica.
-
----
-
-## 16.6 Colchetes
-
-Deve ser tomada uma decisão definitiva sobre:
-
-```text
-[
-]
-```
-
-por causa da assinatura especial:
-
-```java
-String[] args
-```
-
-### Recomendação
-
-Reconhecê-los como tokens, mas permitir seu uso apenas no contexto especial da declaração de `main`.
-
----
-
-## 16.7 Unicode
-
-Ainda não está definido se identificadores poderão utilizar caracteres Unicode.
-
-### Recomendação
-
-Para simplificar a implementação inicial com Flex, utilizar identificadores ASCII:
-
-```text
-[a-zA-Z_][a-zA-Z0-9_]*
-```
+As seções 4.1, 4.2, 4.4, 4.5 e 7.1 registram os padrões e mensagens
+correspondentes.
 
 ---
 
 # 17. Pontos para aprimoramento futuro
 
-As seguintes funcionalidades não são necessárias para concluir a issue atual, mas podem ser consideradas em versões futuras:
+Notação científica, escapes, sufixos de reais e colchetes já foram
+implementados e saíram desta lista (ver seção 16). Restam como extensões
+possíveis:
 
-* literais numéricos em diferentes bases;
-* notação científica;
-* escapes em caracteres;
-* escapes em strings;
+* literais numéricos em diferentes bases (hexadecimal, octal, binário);
 * identificadores Unicode;
-* mensagens de erro léxico mais detalhadas;
-* recuperação de erros para permitir múltiplos erros em uma única execução;
-* armazenamento do lexema e de seu valor convertido na estrutura de token.
+* recuperação de erros para reportar mais de um erro léxico em uma única
+  execução (hoje o lexer descarta o token inválido e continua);
+* mensagens ainda mais específicas para literais numéricos malformados.
 
 Essas funcionalidades não devem ser implementadas sem antes alterar formalmente o escopo da linguagem.
 
@@ -1041,17 +970,19 @@ A issue **“Definir tokens da linguagem-fonte”** será considerada concluída
 * [x] A prioridade das palavras-chave sobre identificadores estiver definida.
 * [x] Os principais casos de erro léxico estiverem documentados.
 * [x] O comportamento geral diante de erro léxico estiver definido.
-* [ ] As decisões pendentes da Seção 16 forem formalmente aprovadas pela equipe.
+* [x] As decisões da Seção 16 estiverem implementadas no analisador léxico.
 
-Enquanto as decisões pendentes não forem aprovadas, esta especificação deve ser considerada **versão preliminar**, embora já seja suficiente para orientar a estrutura inicial do analisador léxico.
+A especificação deixou de ser preliminar: o lexer reconhece os tokens descritos
+aqui e a suíte `make test-check` verifica os casos de `examples/lexico/`.
 
 ---
 
 # 19. Relação com as próximas etapas
 
-Esta especificação deve servir como referência para a implementação do analisador léxico com Flex.
+Esta especificação serve como referência para o analisador léxico com Flex já
+implementado em `lexer/lexer.l`.
 
-O fluxo esperado é:
+O fluxo implementado é:
 
 ```text
 Código Java
@@ -1097,15 +1028,15 @@ pode ser lexicalmente válida mesmo que a gramática posteriormente determine qu
 
 # 20. Estado da especificação
 
-**Status:** preliminar, pronta para implementação inicial do analisador léxico.
+**Status:** implementada e revisada em relação ao `lexer/lexer.l` atual.
 
-A estrutura dos tokens está definida de acordo com o escopo atual da linguagem. Antes da implementação definitiva, a equipe deve aprovar principalmente:
+A estrutura dos tokens corresponde ao escopo da linguagem descrito na
+[especificação de escopo e sintaxe](definicao-escopo-sintaxe-semantica.md). As
+decisões antes listadas como pendentes foram resolvidas: escapes, notação
+científica, sufixos `f`/`d`, colchetes em `String[] args`, limites numéricos e
+identificadores ASCII (sem Unicode). A verificação automática está em
+`make test-check`, com os manifestos em `examples/lexico/`.
 
-1. suporte a escapes em `char`;
-2. suporte a escapes em `String`;
-3. notação científica;
-4. sufixo `f` para `float`;
-5. uso de `[` e `]` na assinatura de `main`;
-6. suporte a Unicode em identificadores.
-
-Após essas decisões, esta especificação poderá ser considerada a referência oficial para a implementação do analisador léxico.
+Para o estado consolidado do projeto, consulte a
+[visão geral](introduction/overview.md) e a
+[arquitetura](architecture/overview.md).

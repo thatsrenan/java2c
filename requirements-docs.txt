@@ -1,0 +1,4 @@
+# Dependências exclusivas da documentação.
+# O ambiente de execução do compilador (gcc, flex, bison) não é afetado.
+mkdocs>=1.6,<2
+mkdocs-material>=9.5,<10

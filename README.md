@@ -4,18 +4,55 @@ Compilador do subconjunto procedural de Java para C, implementado com Flex
 (analisador léxico) e Bison (analisador sintático), com tabela de símbolos e
 verificações de escopo/declaração.
 
+## Documentação
+
+A documentação técnica completa está na pasta `docs/` e pode ser executada
+localmente com:
+
+```bash
+pip install -r requirements-docs.txt
+mkdocs serve
+```
+
+A versão publicada ficará em <https://thatsrenan.github.io/java2c/> após a
+habilitação do GitHub Pages (ver
+[documentação do projeto](docs/development/documentation.md)).
+
+As especificações Markdown em `docs/` (`definicao-escopo-sintaxe-semantica.md`,
+`definicao-tokens.md` e `tabela-simbolos.md`) foram revisadas em relação ao
+código atual. O PDF `especificacao-java-subset.pdf` permanece apenas como
+rascunho histórico.
+
+## Declaração de uso de IA
+
+Por se tratar de um tema de difícil entendimento e envolver programação
+complexa, a IA foi usada de forma geral durante o projeto, com diferentes
+modelos, como apoio à equipe. **Nenhuma decisão foi tomada pela IA**: todas as
+entregas foram revisadas pelos mantenedores e receberam correções, inclusive
+ajustes que ultrapassaram o escopo original. A declaração completa está em
+[`docs/development/ai-usage.md`](docs/development/ai-usage.md).
+
 ## Estrutura do Repositório
 
 ```
 .java2c
 │
-├── docs
-│   ├── definicao-escopo-sintaxe-semantica.md
-│   ├── definicao-tokens.md
-│   └── tabela-simbolos.md
+├── docs                       # documentação MkDocs
+│   ├── index.md
+│   ├── introduction/
+│   ├── getting-started/
+│   ├── architecture/
+│   ├── guides/
+│   ├── reference/
+│   ├── development/
+│   └── definicao-*.md, tabela-simbolos.md  # especificações revisadas
 ├── examples
+│   ├── ast
+│   ├── codegen
 │   ├── escopo
+│   ├── ir
 │   ├── lexico
+│   ├── sintaxe
 │   └── exemplo1.java
 ├── lexer
 │   └── lexer.l
@@ -28,10 +65,15 @@ verificações de escopo/declaração.
 │   ├── semantic_flow.{c,h}   # retorno, alcançabilidade, inicialização
 │   ├── const_eval.{c,h}      # expressões constantes
 │   ├── ir.{c,h}              # estruturas e impressão da TAC
-│   └── ir_gen.{c,h}          # AST -> TAC
+│   ├── ir_gen.{c,h}          # AST -> TAC
+│   ├── ir_opt.{c,h}          # otimizações da IR
+│   └── codegen.{c,h}         # IR -> C
 ├── tests
 │   ├── check.sh
 │   └── check_escopo.sh
+├── .github/workflows/documentation.yml
+├── mkdocs.yml
+├── requirements-docs.txt
 ├── Makefile
 ├── .gitignore
 └── README.md
@@ -135,12 +177,23 @@ locais de blocos diferentes com o mesmo nome, ou que ocultam uma global,
 são renomeadas (`y`, `y_1`), assim como nomes que colidem com palavras
 reservadas de C ou com temporários (`tN`).
 
+## Geração de C
+
+A IR otimizada também é usada para gerar C:
+
+```bash
+./protoparser --c -o saida.c examples/codegen/C01.java       # com temporários
+./protoparser --c-clean -o saida.c examples/codegen/C01.java # expressões em linha
+```
+
 ## Testes
 
 ```bash
+make check               # suíte completa de conferências
 make test-check          # lexer contra examples/lexico/esperado.txt
 make test-escopo-check   # parser + tabela de símbolos contra examples/escopo/esperado.txt
 make test-ir-check       # IR (TAC) contra examples/ir/*.tac
+make test-codegen-check  # C gerado compilado e executado contra examples/codegen
 make test-lexico         # mostra entrada/saída de cada caso léxico
 make test-escopo         # mostra entrada/saída de cada caso de escopo
 ```

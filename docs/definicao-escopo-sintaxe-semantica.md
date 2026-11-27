@@ -10,6 +10,13 @@ Como C não possui orientação a objetos, o subconjunto adotado é predominante
 
 O escopo foi definido de forma a contemplar construções suficientes para demonstrar o funcionamento completo do compilador, desde a análise léxica e sintática até a análise semântica e a geração de código C.
 
+> **Estado do documento:** revisado em relação à implementação atual. Este é o
+> registro canônico do subconjunto aceito. O PDF
+> `especificacao-java-subset.pdf` é um rascunho anterior — ele trata `do while`
+> como não suportado, mantém arrays e sobrecarga como decisões pendentes e
+> inclui `long` na cadeia de conversão — e não deve ser usado como referência
+> do comportamento implementado.
+
 ### 1.1 Funcionalidades suportadas
 
 O compilador suporta as seguintes funcionalidades do subconjunto Java:

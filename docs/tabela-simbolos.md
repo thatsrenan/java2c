@@ -12,7 +12,17 @@ Arquivos envolvidos:
 | `src/symbol_table.h` | Tipos, estruturas e API pública da tabela |
 | `src/symbol_table.c` | Implementação dos escopos, tabela hash e operações |
 | `parser/parser.y` | Cria/consulta símbolos e reporta erros semânticos |
+| `parser/ast.h` | Tipos `TYPE_*` da AST, distintos dos `ST_TYPE_*` da tabela |
+| `src/semantic_flow.{c,h}` | Verificações que dependem do programa inteiro (alcance, retorno, inicialização) |
+| `src/const_eval.{c,h}` | Avaliação de expressões constantes usada nessas verificações |
+| `src/ir_gen.c` | Consulta a tabela para gerar a IR e descobrir tipos de retorno |
 | `src/main.c` | Inicializa/libera a tabela e define o status final da compilação |
+
+As assinaturas públicas também estão resumidas na
+[API da tabela de símbolos](reference/symbol-table-api.md). A tabela convive com
+uma AST separada (`parser/ast.c`), com a representação intermediária
+(`src/ir.c`) e com a geração de C (`src/codegen.c`), conforme descrito no
+[fluxo de compilação](architecture/pipeline.md).
 
 ---
 
@@ -67,31 +77,36 @@ Representa os tipos do subconjunto:
 
 ```c
 typedef enum {
-    TYPE_INT,
-    TYPE_FLOAT,
-    TYPE_DOUBLE,
-    TYPE_BOOLEAN,
-    TYPE_CHAR,
-    TYPE_VOID,
-    TYPE_STRING,
-    TYPE_UNKNOWN
+    ST_TYPE_INT = 0,
+    ST_TYPE_FLOAT,
+    ST_TYPE_DOUBLE,
+    ST_TYPE_BOOLEAN,
+    ST_TYPE_CHAR,
+    ST_TYPE_VOID,
+    ST_TYPE_STRING,
+    ST_TYPE_UNKNOWN
 } DataType;
 ```
 
 | Tipo | Uso |
 | --- | --- |
-| `TYPE_INT` | `int` |
-| `TYPE_FLOAT` | `float` |
-| `TYPE_DOUBLE` | `double` |
-| `TYPE_BOOLEAN` | `boolean` (traduzido para `int` em C) |
-| `TYPE_CHAR` | `char` |
-| `TYPE_VOID` | retorno de método |
-| `TYPE_STRING` | apenas para reconhecer `String[] args` do `main` |
-| `TYPE_UNKNOWN` | usado para evitar cascatas de erro após uma falha |
+| `ST_TYPE_INT` | `int` |
+| `ST_TYPE_FLOAT` | `float` |
+| `ST_TYPE_DOUBLE` | `double` |
+| `ST_TYPE_BOOLEAN` | `boolean` (traduzido para `bool` em C, com `<stdbool.h>`) |
+| `ST_TYPE_CHAR` | `char` (unidade UTF-16: `uint16_t` no modo bruto, `unsigned short` no modo limpo) |
+| `ST_TYPE_VOID` | retorno de método |
+| `ST_TYPE_STRING` | apenas para reconhecer `String[] args` do `main` |
+| `ST_TYPE_UNKNOWN` | usado para evitar cascatas de erro após uma falha |
 
-`TYPE_STRING` não representa um tipo válido para variáveis ou parâmetros
+O prefixo `ST_` evita colisão com os enumeradores `TYPE_*` de `parser/ast.h`,
+que descrevem os mesmos tipos mas com valores numéricos diferentes. O parser
+converte `Type` em `DataType` com `dt_from_type()`; o gerador de IR faz a
+conversão inversa com `type_from_dt()`.
+
+`ST_TYPE_STRING` não representa um tipo válido para variáveis ou parâmetros
 comuns. Ele existe para que o parâmetro convencional `String[] args` do
-`main` possa ser registrado. `TYPE_UNKNOWN` faz com que verificações
+`main` possa ser registrado. `ST_TYPE_UNKNOWN` faz com que verificações
 posteriores não gerem uma sequência de mensagens em cima de um erro já
 reportado.
 
@@ -238,23 +253,45 @@ Ao reconhecer um método, o parser:
 4. analisa o corpo do método;
 5. sai do escopo, descartando parâmetros.
 
+Trecho simplificado da gramática atual (`parser/parser.y`):
+
 ```c
 method_decl:
-    opt_public STATIC type IDENTIFIER
-    {
-        Symbol *function = declare_function($4, $3, yylineno);
-        current_function = function;
-        current_return_type = $3;
-        st_enter_function_scope();
-    }
-    LPAREN param_list_opt RPAREN block
-    {
-        st_exit_scope();
-        current_function = NULL;
-        current_return_type = TYPE_VOID;
-    }
-;
+        STATIC method_sig             { $$ = $2; }
+    |   PUBLIC STATIC method_sig      { $$ = $3; }
+    ;
+
+method_sig:
+        type IDENTIFIER
+        {
+            Symbol *function = declare_function($2, dt_from_type($1), @2.first_line);
+            current_function = function;
+            current_return_type = dt_from_type($1);
+            st_enter_function_scope();
+        }
+        LPAREN param_opt RPAREN block
+        {
+            st_exit_scope();
+            current_function = NULL;
+            current_return_type = ST_TYPE_VOID;
+            $$ = new_method($1, $2, $5, $7, @2.first_line);
+        }
+    |   VOID IDENTIFIER
+        {
+            Symbol *function = declare_function($2, ST_TYPE_VOID, @2.first_line);
+            current_function = function;
+            current_return_type = ST_TYPE_VOID;
+            st_enter_function_scope();
+        }
+        LPAREN param_opt RPAREN block
+        { st_exit_scope(); current_function = NULL; current_return_type = ST_TYPE_VOID; /* ... */ }
+    ;
 ```
+
+O tipo de retorno fica em `method_sig` para que `static int x` só precise
+decidir entre campo e método ao ver o token seguinte (`;`/`=` ou `(`). As
+verificações de `String[] args` e a construção da AST foram omitidas no trecho
+acima.
 
 O escopo do método tem `parent = global`, mas `previous = escopo atual`.
 Por isso, métodos diferentes não compartilham parâmetros ou variáveis locais,
@@ -678,6 +715,19 @@ ERRO SEMANTICO na linha 2: a funcao 'dobro' nao foi declarada antes do uso
 ERRO SEMANTICO na linha 2: a variavel 'i' ja foi declarada neste escopo
 ```
 
+Além dos erros detectados durante o parsing, `src/semantic_flow.c` reporta
+falhas que só podem ser decididas com a AST completa:
+
+```text
+ERRO SEMANTICO na linha N: codigo inalcancavel
+ERRO SEMANTICO na linha N: metodo com retorno nao-void precisa retornar em todos os caminhos
+ERRO SEMANTICO na linha N: a variavel 'x' pode nao ter sido inicializada
+```
+
+`src/const_eval.c` fornece as condições constantes usadas nessas decisões: como
+não há `final`, apenas literais e operadores sobre literais são constantes.
+Assim, `if (true) { x = 5; }` conta como atribuição de `x`.
+
 A flag global `had_semantic_error` é marcada a cada erro. `main()` só considera
 a compilação bem-sucedida quando:
 
@@ -699,13 +749,19 @@ semântico.
   apenas uma casca sintática removida na geração de C.
 - Arrays não fazem parte do sistema de tipos. A única exceção reconhecida é
   `String[] args` na assinatura do `main`.
-- O campo `initialized` é registrado, mas a linguagem ainda não exige que toda
-  variável local seja inicializada antes do uso (caso `E11` é aceito).
-- A análise é feita durante o parsing. Ainda não existe uma AST separada nem
-  uma etapa posterior de geração de código C.
+- O campo `initialized` alimenta a análise de atribuição definitiva em
+  `src/semantic_flow.c`. Hoje o caso `E11` **é rejeitado**
+  (`a variavel 'x' pode nao ter sido inicializada`), ao contrário do que
+  registra a versão anterior deste documento.
+- Parte das verificações acontece durante o parsing e parte depois dele, sobre
+  a AST (`src/semantic_flow.c`). A AST validada alimenta a IR em `src/ir_gen.c`
+  e, por fim, o gerador de C em `src/codegen.c`.
 - Como os escopos são liberados ao sair, a tabela não mantém um histórico
   completo de todos os símbolos já declarados. Para depuração, use
-  `--tabela`, que imprime os escopos ativos no fim do programa.
+  `--tabela`, que imprime os escopos ativos no fim do parsing.
+- O gerador de IR consulta o escopo global da tabela para descobrir o tipo de
+  retorno de funções (e evitar temporários em chamadas `void`). Por isso
+  `ir_generate()` exige que `st_init()` e `st_free()` envolvam a chamada.
 
 ---
 
@@ -720,4 +776,8 @@ semântico.
   isolar métodos do `main` implícito.
 - Blocos e `for` abrem e fecham escopos, descartando os símbolos ao sair.
 - O parser usa a tabela para verificar declaração, uso, tipos, retorno,
-  `break`/`continue` e sobrecarga de métodos.
+  `break`/`continue` e sobrecarga de métodos; `semantic_flow_check()` completa
+  o trabalho verificando alcançabilidade, retorno em todos os caminhos e
+  inicialização definitiva sobre a AST.
+- A tabela permanece ativa durante `ir_generate()` e é liberada por `st_free()`
+  apenas no fim de `main()`.
